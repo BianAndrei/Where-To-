@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id
+  name String
+  email String @unique
+  emailVerified Boolean @default(false)
+  twoFactorEnabled Boolean @default(false)
+  suspendedAt DateTime?
+  twoFactors TwoFactor[]
+  credits CreditGrant[]
+  milestones Milestone[]
+  image String?
+  preferences Json @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sessions Session[]
+  accounts Account[]
+  entitlement Entitlement?
+  trips Trip[]
+  members TripMember[]
+  @@map("user")
+}
+model Session {
+  id String @id
+  expiresAt DateTime
+  token String @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  adminProof AdminProof?
+  @@index([userId])
+  @@map("session")
+}
+model Account {
+  id String @id
+  accountId String
+  providerId String
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  accessToken String?
+  refreshToken String?
+  idToken String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope String?
+  password String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId])
+  @@unique([providerId,accountId])
+  @@map("account")
+}
+model Verification {
+  id String @id
+  identifier String
+  value String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([identifier])
+  @@map("verification")
+}
+model Entitlement {
+  userId String @id
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  freeTripClaimedAt DateTime?
+  freeTripReplacementUsedAt DateTime?
+  stripeCustomerId String? @unique
+  stripeSubscriptionId String? @unique
+  subscriptionStatus String @default("inactive")
+  subscriptionStart DateTime?
+  paidUntil DateTime?
+  cancelAtPeriodEnd Boolean @default(false)
+  billingInterval String?
+  unitAmount Int?
+  currency String?
+  stripeSyncedAt DateTime?
+  lastPaymentStatus String?
+}
+model Trip {
+  id String @id @default(uuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id])
+  state Json
+  version Int @default(1)
+  isFree Boolean @default(false)
+  funding String @default("subscription")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  archivedAt DateTime?
+  members TripMember[]
+  history TripHistory[]
+  links ShareLink[]
+  documents Document[]
+  jobs Job[]
+  menus Menu[]
+  @@index([ownerId,createdAt])
+}
+model TripMember {
+  tripId String
+  userId String
+  role String
+  trip Trip @relation(fields:[tripId],references:[id],onDelete:Cascade)
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  @@id([tripId,userId])
+  @@index([userId])
+}
+model TripHistory {
+  id String @id @default(uuid())
+  tripId String
+  trip Trip @relation(fields:[tripId],references:[id],onDelete:Cascade)
+  version Int
+  actor String
+  action String
+  createdAt DateTime @default(now())
+  @@index([tripId,createdAt])
+}
+model ShareLink {
+  id String @id @default(uuid())
+  tripId String
+  trip Trip @relation(fields:[tripId],references:[id],onDelete:Cascade)
+  tokenHash String @unique
+  role String @default("viewer")
+  showBudget Boolean @default(false)
+  showAccommodation Boolean @default(false)
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+}
+model Document {
+  id String @id @default(uuid())
+  tripId String
+  trip Trip @relation(fields:[tripId],references:[id],onDelete:Cascade)
+  itemId String?
+  name String
+  mime String
+  size Int
+  storageKey String
+  createdAt DateTime @default(now())
+  @@index([tripId])
+}
+model Job {
+  id String @id @default(uuid())
+  tripId String
+  trip Trip @relation(fields:[tripId],references:[id],onDelete:Cascade)
+  type String
+  status String @default("queued")
+  input Json
+  output Json?
+  error String?
+  errorCode String?
+  startedAt DateTime?
+  finishedAt DateTime?
+  attempts JobAttempt[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([tripId,createdAt])
+}
+model Menu {
+  id String @id @default(uuid())
+  tripId String
+  trip Trip @relation(fields:[tripId],references:[id],onDelete:Cascade)
+  ownerId String
+  itemId String
+  sourceHash String
+  source String
+  data Json
+  quotaBucket String
+  createdAt DateTime @default(now())
+  @@unique([tripId,sourceHash])
+  @@index([ownerId,quotaBucket])
+}
+model ProviderUsage {
+  id String @id
+  provider String
+  period String
+  used Int @default(0)
+  @@unique([provider,period])
+}
+model StripeEvent {
+  id String @id
+  processedAt DateTime? @default(now())
+  type String @default("legacy")
+  status String @default("processed")
+  errorCode String?
+  subscriptionId String?
+  attempts Int @default(0)
+  createdAt DateTime @default(now())
+  @@index([status, createdAt])
+}
+
+model TwoFactor {
+  id String @id
+  secret String
+  backupCodes String
+  userId String
+  verified Boolean @default(true)
+  failedVerificationCount Int @default(0)
+  lockedUntil DateTime?
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  @@index([userId])
+  @@map("twoFactor")
+}
+model AdminProof {
+  sessionId String @id
+  verifiedAt DateTime
+  session Session @relation(fields:[sessionId], references:[id], onDelete:Cascade)
+}
+model CreditGrant {
+  id String @id @default(uuid())
+  userId String
+  kind String
+  quantity Int
+  consumed Int @default(0)
+  revoked Int @default(0)
+  reason String
+  actorId String
+  createdAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  uses CreditUse[]
+  @@index([userId, kind, createdAt])
+}
+model CreditUse {
+  id String @id @default(uuid())
+  grantId String
+  resourceKey String @unique
+  createdAt DateTime @default(now())
+  grant CreditGrant @relation(fields:[grantId], references:[id], onDelete:Cascade)
+  @@index([grantId])
+}
+model AdminAudit {
+  id String @id @default(uuid())
+  actorId String
+  targetId String
+  action String
+  reason String
+  outcome String
+  requestKey String @unique
+  fingerprint String
+  change Json
+  createdAt DateTime @default(now())
+  @@index([targetId, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+}
+model IntegrationControl {
+  provider String @id
+  paused Boolean @default(false)
+  limit Int?
+  checkedAt DateTime?
+  health String @default("unknown")
+  errorCode String?
+  updatedAt DateTime @updatedAt
+}
+model JobAttempt {
+  id String @id @default(uuid())
+  jobId String
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  status String @default("processing")
+  errorCode String?
+  job Job @relation(fields:[jobId], references:[id], onDelete:Cascade)
+  @@index([jobId, startedAt])
+}
+model WorkerHeartbeat {
+  id String @id
+  seenAt DateTime @default(now())
+}
+model Milestone {
+  id String @id @default(uuid())
+  userId String
+  event String
+  createdAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  @@unique([userId, event])
+  @@index([event, createdAt])
+}
+model DevMail {
+  id String @id @default(uuid())
+  to String
+  subject String
+  url String
+  createdAt DateTime @default(now())
+}

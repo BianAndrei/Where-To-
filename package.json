@@ -1,0 +1,39 @@
+{
+  "name": "whereto",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web,worker \"npm run dev -w @whereto/api\" \"npm run dev -w @whereto/web\" \"npm run worker -w @whereto/api\"",
+    "build": "npm run build -w @whereto/shared && npm run build -w @whereto/api && npm run build -w @whereto/web",
+    "typecheck": "tsc --noEmit -p packages/shared && tsc --noEmit -p apps/api && tsc --noEmit -p apps/web",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "db:generate": "npm run db:generate -w @whereto/api",
+    "db:migrate": "npm run db:migrate -w @whereto/api",
+    "db:check": "tsx --env-file=.env scripts/check-database.ts",
+    "admin:owner": "tsx --env-file=.env scripts/admin-owner.ts",
+    "brand:build": "tsx scripts/brand-assets.ts"
+  },
+  "overrides": {
+    "prisma": "6.12.0",
+    "@prisma/client": "6.12.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^22.18.0",
+    "concurrently": "^9.2.1",
+    "prettier": "^3.9.6",
+    "prisma": "6.12.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@prisma/client": "6.12.0"
+  }
+}

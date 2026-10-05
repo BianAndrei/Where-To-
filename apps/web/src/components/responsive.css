@@ -1,0 +1,765 @@
+/* Responsive layout refinements shared by public pages and the trip workspace. */
+@media (max-width: 850px) {
+  :root
+    :is(
+      .planner-header > div,
+      .budget-main,
+      .budget-side,
+      .view-title > div,
+      .expense-row > span,
+      .expense-row > span > span,
+      .trip-card-body,
+      .dashboard-greeting > div,
+      .planning-stack,
+      .modal-heading > div
+    ) {
+    min-width: 0;
+  }
+  :root
+    :is(
+      .planner-header h1,
+      .trip-card h2,
+      .item-card h3,
+      .expense-row strong,
+      .settlement-row > span,
+      .modal-heading h2,
+      .dashboard-greeting h1,
+      .wt-select-value
+    ) {
+    overflow-wrap: anywhere;
+  }
+  :root .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  :root .form-grid.three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 641px) and (max-width: 850px) {
+  :root .mobile-tools {
+    display: none;
+  }
+  :root .planner-header h1 {
+    font-size: 28px;
+  }
+  :root .planner-header {
+    padding-inline: 22px;
+  }
+  :root .planning-essentials {
+    margin-inline: 22px;
+  }
+}
+@media (max-width: 640px) {
+  /* One mobile gutter, including devices with a display cutout. */
+  :root {
+    --mobile-gutter: max(
+      16px,
+      env(safe-area-inset-left),
+      env(safe-area-inset-right)
+    );
+  }
+  :root
+    :is(
+      .wt-shell,
+      .section-shell,
+      .dashboard-main,
+      .app-header,
+      .wt-nav,
+      .planner-header,
+      .itinerary-controls,
+      .itinerary-layout,
+      .budget-layout
+    ) {
+    padding-inline: var(--mobile-gutter);
+  }
+  :root .wt-nav {
+    padding-block: 13px;
+    gap: 12px;
+  }
+  :root :is(.wt-nav, .app-header) .brand-artwork .brand-graphic--mark {
+    width: 36px;
+  }
+  :root :is(.wt-nav, .app-header) .brand-artwork .brand-graphic--name {
+    width: 88px;
+  }
+  :root :is(.wt-nav, .app-header) .brand.brand-artwork {
+    gap: 6px;
+  }
+  :root .wave-trigger {
+    min-height: 44px;
+    padding: 8px 14px;
+  }
+  :root .app-header {
+    gap: 12px;
+    padding-block: 12px;
+  }
+  :root .app-header > div {
+    gap: 6px;
+    min-width: 0;
+  }
+  :root .app-header .text-link {
+    font-size: 11px;
+    min-height: 44px;
+    gap: 6px;
+  }
+  :root .app-header .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  :root .app-header .tag {
+    font-size: 10px;
+    padding: 7px 10px;
+  }
+
+  /* Keep the public site expressive without making each section a full screen. */
+  :root .wt-hero {
+    padding-top: 22px;
+    padding-bottom: 64px;
+    gap: 14px;
+    min-height: auto;
+  }
+  :root .wt-hero h1 {
+    font-size: clamp(33px, 9.4vw, 46px);
+    letter-spacing: -0.06em;
+    line-height: 1.07;
+  }
+  :root .wt-hero-copy > p {
+    font-size: 13px;
+    line-height: 1.65;
+    margin-top: 18px;
+    max-width: 36ch;
+  }
+  :root .wt-kicker {
+    font-size: 10px;
+    margin-bottom: 18px;
+  }
+  :root .wt-hero .button {
+    min-height: 48px;
+    padding-block: 12px;
+    font-size: 13px;
+  }
+  :root .wt-hero-art {
+    padding-top: 16px;
+    max-width: 350px;
+    width: 100%;
+    margin-inline: auto;
+  }
+  :root .wt-art-note {
+    font-size: 10px;
+  }
+  :root .landing-page h2 {
+    font-size: clamp(28px, 7.5vw, 36px);
+    letter-spacing: -0.045em;
+  }
+  :root
+    :is(
+      .wt-section-heading > p,
+      .wt-itinerary-copy > p,
+      .wt-budget-copy > p,
+      .wt-menu-copy > p
+    ) {
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  :root
+    :is(
+      .wt-itinerary-inner,
+      .wt-budget-section,
+      .wt-menu-inner,
+      .wt-pricing-section
+    ) {
+    padding-block: 44px;
+    gap: 24px;
+  }
+  :root .wt-faq {
+    padding-block: 28px 44px;
+    gap: 18px;
+  }
+  :root .wt-faq-trigger {
+    padding-block: 17px;
+    font-size: 13px;
+    gap: 12px;
+  }
+  :root .wt-final {
+    padding-block: 38px 44px;
+  }
+  :root .wt-final h2 {
+    font-size: clamp(36px, 10vw, 48px);
+  }
+  :root .wt-final > .doodle {
+    width: 70px;
+  }
+  :root .wt-footer {
+    padding: 28px var(--mobile-gutter);
+    gap: 22px;
+  }
+  :root .wt-footer nav {
+    gap: 8px 20px;
+  }
+  :root .wt-footer nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  :root .wave-menu-scroll {
+    padding: 18px var(--mobile-gutter) max(22px, env(safe-area-inset-bottom));
+  }
+  :root .wave-menu-body {
+    padding-block: 28px;
+  }
+  :root .wave-menu-body nav {
+    gap: 10px;
+  }
+  :root .wave-menu-link {
+    font-size: clamp(29px, 8vw, 40px);
+    min-height: 48px;
+  }
+  :root .wave-menu-bottom {
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  :root :is(.pricing-page, .legal) {
+    padding-top: 28px;
+  }
+  :root :is(.pricing-page h1, .legal h1) {
+    font-size: clamp(29px, 8vw, 36px);
+    line-height: 1.15;
+    letter-spacing: -0.04em;
+  }
+  :root .section-intro {
+    margin-bottom: 26px;
+  }
+  :root .section-intro > p {
+    font-size: 13px;
+  }
+  :root .wt-prices {
+    margin-top: 28px;
+    gap: 20px;
+  }
+  :root .wt-prices .price-card {
+    padding: 22px;
+  }
+  :root .wt-prices .price-card h3 {
+    font-size: 23px;
+  }
+  :root .wt-prices .price-number {
+    font-size: 50px;
+    margin: 16px 0 12px;
+  }
+  :root .fare-top > .doodle {
+    width: 46px;
+    height: 46px;
+  }
+  :root .wt-prices .price-card ul {
+    width: calc(100% + 44px);
+    margin: 20px -22px;
+    padding: 20px 22px 0;
+    gap: 11px;
+  }
+  :root :is(.pricing-details h2, .legal h2) {
+    font-size: 21px;
+  }
+
+  /* Accounts, trip cards and the setup flow. */
+  :root .auth-main {
+    padding: 98px var(--mobile-gutter) max(28px, env(safe-area-inset-bottom));
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  :root .auth-main .back-link {
+    left: var(--mobile-gutter);
+    top: 18px;
+    min-height: 44px;
+    font-size: 12px;
+  }
+  :root .auth-form h2 {
+    font-size: clamp(27px, 7.5vw, 32px);
+    line-height: 1.2;
+    margin-top: 13px;
+  }
+  :root .auth-form {
+    width: 100%;
+  }
+  :root .dashboard-main {
+    padding-block: 24px 36px;
+  }
+  :root .dashboard-greeting h1 {
+    font-size: clamp(26px, 7.2vw, 32px);
+    margin-block: 10px;
+  }
+  :root .dashboard-greeting > .doodle {
+    width: 44px;
+    height: 44px;
+  }
+  :root .dashboard-greeting p {
+    max-width: 38ch;
+  }
+  :root .toolbar {
+    flex-wrap: wrap;
+    margin: 22px 0 14px;
+    gap: 10px;
+  }
+  :root .toolbar .button {
+    min-height: 44px;
+    padding-inline: 12px;
+  }
+  :root .segmented > button {
+    min-height: 40px;
+  }
+  :root .trip-grid {
+    gap: 18px;
+  }
+  :root .trip-art {
+    height: 148px;
+  }
+  :root .trip-card-body {
+    padding: 18px;
+  }
+  :root .trip-card h2 {
+    font-size: 22px;
+    line-height: 1.2;
+  }
+  :root .trip-meta {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  :root .trip-bottom {
+    gap: 10px;
+  }
+  :root .trip-bottom > span {
+    min-width: 0;
+    font-size: 18px;
+  }
+  :root .new-trip-card {
+    min-height: 204px;
+    padding: 24px 18px;
+  }
+  :root .new-trip-card h2 {
+    font-size: 23px;
+  }
+  :root .dashboard-tip {
+    padding: 18px;
+    margin-top: 24px;
+  }
+  :root .onboarding-progress {
+    justify-content: space-between;
+    margin: 18px var(--mobile-gutter);
+    gap: 8px;
+  }
+  :root .onboarding-progress > div {
+    min-width: 0;
+    flex: 1;
+  }
+  :root .onboarding-card {
+    margin: 0 var(--mobile-gutter) 24px;
+    padding: 20px 18px;
+    border-radius: 18px;
+  }
+  :root .onboarding-top > .doodle {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 12px;
+  }
+  :root .onboarding-top h1 {
+    font-size: clamp(25px, 6.7vw, 30px);
+    line-height: 1.18;
+    margin: 10px 0;
+  }
+  :root .onboarding-top p {
+    margin-top: 8px;
+  }
+  :root .onboarding-top {
+    margin-bottom: 22px;
+  }
+  :root .people-counter {
+    margin-block: 18px;
+    padding-block: 0;
+  }
+  :root .people-counter strong {
+    font-size: 36px;
+  }
+  :root .onboarding-actions {
+    margin-top: 22px;
+    gap: 10px;
+  }
+  :root .onboarding-actions .button {
+    min-height: 44px;
+  }
+
+  /* The plan comes first; secondary actions live in the tools drawer. */
+  :root .planner-header {
+    padding-block: 17px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  :root .planner-header > div:first-child {
+    width: 100%;
+  }
+  :root .planner-header h1 {
+    font-size: clamp(22px, 6vw, 27px);
+    line-height: 1.2;
+    max-width: none;
+    margin: 7px 0;
+  }
+  :root .planner-header p {
+    font-size: 10px;
+    max-width: none;
+    gap: 6px;
+  }
+  :root .planner-header-actions {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+    gap: 8px;
+    align-items: center;
+  }
+  :root .planner-header-actions .button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px;
+  }
+  :root .planner-header-actions .trip-search-trigger {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
+  :root .planner-header-actions .save-status {
+    position: static;
+    font-size: 9px;
+    margin-right: auto;
+  }
+  :root .planner-header-actions .save-status svg {
+    width: 12px;
+  }
+  :root .demo-banner {
+    padding: 7px var(--mobile-gutter);
+    gap: 10px;
+    font-size: 9px;
+  }
+  :root .demo-banner > span {
+    max-width: none;
+    flex: 1;
+  }
+  :root .demo-banner > span > .doodle {
+    display: none;
+  }
+  :root .demo-banner a {
+    font-size: 9px;
+    max-width: 76px;
+  }
+  :root .mobile-tools {
+    margin: 12px var(--mobile-gutter) 10px;
+    border-radius: 13px;
+  }
+  :root .mobile-tools > summary {
+    min-height: 54px;
+    padding: 11px 13px;
+    gap: 10px;
+  }
+  :root .mobile-tools-label strong {
+    font-size: 12px;
+  }
+  :root .mobile-tools-label > span {
+    font-size: 10px;
+    margin-top: 1px;
+  }
+  :root .mobile-tools-grid {
+    gap: 5px;
+    padding: 0 9px 9px;
+  }
+  :root .mobile-tools-grid > button {
+    font-size: 11px;
+    min-height: 48px;
+    gap: 8px;
+    padding: 10px 8px;
+  }
+  :root .mobile-tools-grid > button svg {
+    width: 18px;
+    flex-shrink: 0;
+  }
+  :root .planning-essentials {
+    margin: 0 var(--mobile-gutter) 10px;
+  }
+  :root .planning-shortcuts {
+    display: none;
+  }
+  :root .missing-pieces {
+    border-radius: 13px;
+  }
+  :root .missing-pieces summary {
+    padding: 11px 13px;
+    gap: 12px;
+  }
+  :root .missing-pieces summary b {
+    font-size: 12px;
+  }
+  :root .missing-pieces summary small {
+    font-size: 10px;
+    margin-top: 2px;
+  }
+  :root .missing-pieces summary > span:last-child {
+    min-width: 27px;
+    height: 27px;
+    font-size: 13px;
+  }
+  :root .missing-list {
+    padding: 0 13px 13px;
+  }
+  :root .missing-list > div {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  :root .missing-list :is(b, small) {
+    font-size: 11px;
+  }
+  :root .itinerary-controls {
+    padding-top: 12px;
+  }
+  :root .itinerary-layout {
+    padding-block: 18px 28px;
+  }
+  :root .day-heading {
+    margin-bottom: 14px;
+  }
+  :root .day-heading h2 {
+    font-size: 20px;
+  }
+  :root .flight-timeline.compact .flight-route-heading {
+    font-size: 13px;
+    gap: 7px;
+    margin-bottom: 13px;
+  }
+  :root .flight-timeline.compact .flight-airports {
+    gap: 16px;
+  }
+  :root .flight-timeline.compact .flight-airport strong {
+    font-size: 15px;
+  }
+  :root .flight-timeline.compact .flight-airport b {
+    font-size: 13px;
+  }
+  :root .flight-timeline.compact .flight-airport > span {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  :root .flight-timeline.compact .flight-airport small {
+    font-size: 10px;
+  }
+  :root .flight-timeline.compact :is(.flight-segment-label, .flight-layover) {
+    font-size: 11px;
+  }
+  :root .day-heading > .button {
+    min-height: 44px;
+    font-size: 9px;
+  }
+  :root .context-actions {
+    gap: 8px 16px;
+    flex-wrap: wrap;
+  }
+  :root .context-actions > .plain-link {
+    min-height: 44px;
+    font-size: 11px;
+  }
+
+  /* Let amounts and long names fit without squeezing the whole budget. */
+  :root .budget-layout {
+    padding-block: 18px 28px;
+    gap: 20px;
+  }
+  :root .budget-main > .view-title {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  :root .budget-main > .view-title h2 {
+    font-size: 22px;
+  }
+  :root .budget-main > .view-title > .button {
+    min-height: 44px;
+    font-size: 11px;
+  }
+  :root .budget-stats {
+    margin-top: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  :root .budget-stats > div {
+    padding: 14px 11px;
+    min-width: 0;
+  }
+  :root .budget-stats strong {
+    font-size: clamp(18px, 5.1vw, 24px);
+    letter-spacing: -0.04em;
+    overflow-wrap: anywhere;
+  }
+  :root .budget-stats .rolling-visual {
+    white-space: normal;
+  }
+  :root .budget-explainer {
+    padding: 14px;
+  }
+  :root .budget-explainer dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  :root .budget-explainer p {
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  :root .expense-heading {
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  :root .expense-heading h3 {
+    font-size: 17px;
+    max-width: none;
+  }
+  :root .expense-heading .wt-select-trigger {
+    font-size: 12px;
+    max-width: 100%;
+    width: auto;
+    min-width: 110px;
+  }
+  :root :is(.expense-table-header, .expense-row, .expense-total) {
+    grid-template-columns: minmax(0, 1fr) minmax(64px, auto) minmax(60px, auto);
+    padding: 13px 10px;
+    gap: 7px;
+  }
+  :root .expense-row > span:first-child {
+    min-width: 0;
+  }
+  :root .expense-row small {
+    overflow-wrap: anywhere;
+  }
+  :root .settlement-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  :root .settlement-row > .button {
+    min-height: 44px;
+  }
+  :root .budget-donut-card {
+    padding: 20px;
+  }
+  :root .budget-donut {
+    width: 172px;
+    height: 172px;
+  }
+  :root .budget-donut strong {
+    font-size: 27px;
+  }
+
+  /* Forms stay inside the viewport; 16px text prevents focus zoom on iOS. */
+  :root
+    :is(
+      input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+      textarea
+    ) {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+    min-height: 44px;
+    padding: 10px 11px;
+  }
+  :root .field {
+    margin-block: 13px;
+    gap: 6px;
+  }
+  :root .field > :is(span, label) {
+    font-size: 11px;
+  }
+  :root .field small {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  :root .wt-select-trigger {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    font-size: 13px;
+  }
+  :root .modal-content {
+    width: calc(100% - 20px);
+    max-height: calc(
+      100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+    padding: 20px 16px;
+    border-radius: 17px;
+  }
+  :root .modal-heading {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  :root .modal-heading h2 {
+    font-size: 23px;
+    line-height: 1.2;
+  }
+  :root .modal-content :is(.editor-fieldset > .muted, .trip-tools > .muted) {
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  :root .modal-heading .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  :root .editor-tabs {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  :root .editor-tabs button {
+    flex: 1 0 auto;
+    min-height: 44px;
+    padding-inline: 10px;
+  }
+  :root .editor-footer {
+    bottom: -20px;
+    padding: 14px 0 max(8px, env(safe-area-inset-bottom));
+    margin-top: 20px;
+  }
+  :root .editor-footer .button {
+    min-height: 44px;
+  }
+  :root .planning-stack {
+    gap: 16px;
+    font-size: 13px;
+  }
+  :root .planning-stack h3 {
+    font-size: 17px;
+  }
+  :root .planning-intro {
+    padding: 14px;
+    gap: 12px;
+  }
+  :root .planning-upload {
+    padding: 17px;
+    gap: 12px;
+  }
+  :root .planning-actions {
+    gap: 10px;
+  }
+  :root .planning-review {
+    padding: 14px;
+  }
+}
+@media (max-width: 380px) {
+  :root .form-grid.three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  :root .form-grid.three > .field:last-child {
+    grid-column: 1 / -1;
+  }
+  :root .cost-line-editor {
+    padding: 10px;
+  }
+  :root .onboarding-card {
+    padding-inline: 16px;
+  }
+}
+@media print {
+  .planner.nav-compact .planner-body {
+    margin-left: 0;
+  }
+}

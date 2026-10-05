@@ -1,0 +1,97 @@
+import React, { useRef } from "react";
+import { useInView } from "motion/react";
+
+/** Vector paths follow the approved map-and-suitcase illustration. */
+export function TravelIllustration({
+  animated = true,
+}: {
+  animated?: boolean;
+}) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 1536 1024"
+      className={`travel-illustration${animated ? " travel-flow" : ""}`}
+      role="img"
+      aria-label="A hand-drawn travel map and suitcase on soft pastel paint splats"
+      fill="none"
+    >
+      <path
+        className="travel-paint-apricot"
+        d="M507 216C532 150 566 97 634 100C716 100 782 176 850 222C880 244 892 216 942 213C1011 207 1053 257 1060 326C1066 387 1054 445 1031 505C1008 567 1032 626 985 676C932 732 842 752 766 780C691 807 647 825 579 803C518 784 500 756 477 705C453 655 439 644 389 617C333 588 276 567 257 515C236 460 280 391 327 350C382 302 431 279 482 246C495 238 502 230 507 216Z"
+        fill="#FFD69A"
+      />
+      <path
+        className="travel-paint-mint"
+        d="M946 503C982 485 992 452 1049 449C1124 446 1211 490 1239 558C1253 593 1282 628 1283 687C1288 756 1250 816 1190 846C1135 873 1059 878 1016 847C975 817 977 780 951 735C924 688 911 650 910 598C909 553 919 522 946 503Z"
+        fill="#CDE5D4"
+      />
+      <g className="travel-map">
+        <path
+          d="M379 486C387 438 422 390 461 377C497 364 534 382 561 406C589 428 604 453 580 474C561 493 528 480 506 499C484 517 484 544 452 555C411 570 374 543 379 486Z"
+          fill="#CDE5D4"
+        />
+        <path
+          d="M696 618C719 597 752 596 776 565C803 531 809 477 839 460C871 440 894 465 912 492C933 522 951 538 935 574C915 616 874 630 827 647C794 659 756 683 725 682C692 681 669 646 696 618Z"
+          fill="#CBDDF0"
+        />
+        <g
+          stroke="#292823"
+          strokeWidth="22"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M909 529L891 336Q890 320 881 325L766 377C748 385 692 372 651 371C618 365 561 329 537 318Q531 314 522 318L380 378Q361 385 364 406L388 718L551 652L706 728L863 657" />
+          <path d="M531 318L535 488M550 595L551 652" />
+          <g className="travel-map-route">
+            <circle cx="443" cy="629" r="29" fill="#292823" stroke="none" />
+            <path d="M480 587L498 569M525 546L548 534M581 530Q594 533 604 540M630 562Q643 571 655 572M690 576Q702 575 711 568M731 545Q738 532 737 519M728 487L717 471" />
+          </g>
+        </g>
+        <g
+          className="travel-location-pin"
+          stroke="#292823"
+          strokeWidth="21"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path
+            d="M705 441C684 416 635 340 637 295C638 250 673 216 719 216C765 216 799 248 799 288C800 338 746 395 705 441Z"
+            fill="#E8ACA0"
+          />
+          <circle cx="718" cy="299" r="25" fill="#FFD69A" />
+        </g>
+      </g>
+      <g
+        className="travel-luggage"
+        stroke="#292823"
+        strokeWidth="21"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M958 553C959 517 979 502 1016 502C1055 502 1071 518 1076 553" />
+        <path
+          d="M938 560C986 552 1078 550 1123 563C1170 576 1180 604 1183 659C1186 700 1187 743 1173 770C1161 793 1144 800 1107 801L933 801C883 801 861 794 854 759C847 727 849 681 853 650C860 591 883 569 938 560Z"
+          fill="#E8ACA0"
+        />
+        <path d="M934 560C921 623 919 726 933 798M1112 561C1123 622 1121 731 1112 799" />
+        <g className="travel-luggage-sun" strokeWidth="16">
+          <circle cx="1025" cy="685" r="29" fill="#FFD69A" />
+          <g className="travel-sun-rays">
+            <path d="M1013 632L1008 613M1062 642L1073 628M1077 695L1093 699M1031 737L1034 755M976 712L959 722M973 660L958 653" />
+          </g>
+        </g>
+      </g>
+    </svg>
+  );
+}
+
+export function TravelDrawing() {
+  const ref = useRef<HTMLDivElement>(null);
+  const visible = useInView(ref, { margin: "100px 0px" });
+  return (
+    <div ref={ref} className="travel-drawing" data-visible={visible}>
+      <TravelIllustration />
+    </div>
+  );
+}

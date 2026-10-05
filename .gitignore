@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-presentation/
+.env
+.env.*
+!.env.example
+.data/
+artifacts/
+test-results/
+playwright-report/
+coverage/
+*.log
+apps/api/generated/

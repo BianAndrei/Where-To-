@@ -1,0 +1,103 @@
+/* Shared with the standalone animated SVG. Paths stay intact; connected parts
+   move as groups, with a quiet resting beat between each little gesture. */
+.travel-illustration {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.travel-flow .travel-paint-apricot {
+  transform-origin: 680px 460px;
+  animation: travel-apricot-drift 12s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.travel-flow .travel-paint-mint {
+  transform-origin: 1090px 660px;
+  animation: travel-mint-drift 12s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.travel-flow .travel-location-pin {
+  transform-origin: 705px 441px;
+  animation: travel-pin-landing 9.6s cubic-bezier(0.4, 0, 0.3, 1) infinite;
+}
+.travel-flow .travel-luggage {
+  transform-origin: 1020px 800px;
+  animation: travel-bag-sway 9.6s cubic-bezier(0.4, 0, 0.3, 1) infinite;
+}
+.travel-flow .travel-sun-rays {
+  transform-origin: 1025px 685px;
+  animation: travel-sun-twist 9.6s cubic-bezier(0.4, 0, 0.3, 1) infinite;
+}
+@keyframes travel-pin-landing {
+  0%,
+  9%,
+  38%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  20% {
+    transform: translateY(-23px) rotate(-3deg);
+  }
+  29% {
+    transform: translateY(3px) rotate(1deg);
+  }
+  34% {
+    transform: translateY(-2px) rotate(0);
+  }
+}
+@keyframes travel-bag-sway {
+  0%,
+  34%,
+  73%,
+  100% {
+    transform: rotate(0);
+  }
+  46% {
+    transform: rotate(-2.8deg);
+  }
+  57% {
+    transform: rotate(1.6deg);
+  }
+  66% {
+    transform: rotate(-0.5deg);
+  }
+}
+@keyframes travel-sun-twist {
+  0%,
+  40%,
+  85%,
+  100% {
+    transform: rotate(0);
+  }
+  59% {
+    transform: rotate(24deg);
+  }
+  73% {
+    transform: rotate(-4deg);
+  }
+}
+@keyframes travel-apricot-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0);
+  }
+  50% {
+    transform: translate(-6px, 5px) rotate(-1deg);
+  }
+}
+@keyframes travel-mint-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0);
+  }
+  50% {
+    transform: translate(5px, -4px) rotate(1.2deg);
+  }
+}
+.motion-paused .travel-flow *,
+.travel-drawing[data-visible="false"] .travel-flow * {
+  animation-play-state: paused !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .travel-flow * {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@whereto/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^3.25.76",
+    "decimal.js": "^10.6.0"
+  }
+}

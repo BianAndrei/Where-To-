@@ -1,0 +1,78 @@
+{
+  "segments": [
+    {
+      "id": "demo-flight-1",
+      "number": "LH1423",
+      "airline": "Lufthansa",
+      "departure": {
+        "airport": {
+          "code": "OTP",
+          "name": "Henri Coanda International Airport",
+          "city": "Bucharest",
+          "country": "RO",
+          "lat": 44.5722007751,
+          "lon": 26.1021995544,
+          "timezone": "Europe/Bucharest"
+        },
+        "localTime": "2026-10-12T06:00",
+        "offset": null,
+        "terminal": "",
+        "gate": ""
+      },
+      "arrival": {
+        "airport": {
+          "code": "FRA",
+          "name": "Frankfurt am Main International Airport",
+          "city": "Frankfurt-am-Main",
+          "country": "DE",
+          "lat": 50.0264015198,
+          "lon": 8.543129921,
+          "timezone": "Europe/Berlin"
+        },
+        "localTime": "2026-10-12T07:40",
+        "offset": null,
+        "terminal": "",
+        "gate": ""
+      },
+      "selfTransfer": false
+    },
+    {
+      "id": "demo-flight-2",
+      "number": "LH1172",
+      "airline": "Lufthansa",
+      "departure": {
+        "airport": {
+          "code": "FRA",
+          "name": "Frankfurt am Main International Airport",
+          "city": "Frankfurt-am-Main",
+          "country": "DE",
+          "lat": 50.0264015198,
+          "lon": 8.543129921,
+          "timezone": "Europe/Berlin"
+        },
+        "localTime": "2026-10-12T09:10",
+        "offset": null,
+        "terminal": "",
+        "gate": ""
+      },
+      "arrival": {
+        "airport": {
+          "code": "LIS",
+          "name": "Lisbon Portela Airport",
+          "city": "Lisbon",
+          "country": "PT",
+          "lat": 38.7812995911,
+          "lon": -9.1359195709,
+          "timezone": "Europe/Lisbon"
+        },
+        "localTime": "2026-10-12T11:25",
+        "offset": null,
+        "terminal": "",
+        "gate": ""
+      },
+      "selfTransfer": false
+    }
+  ],
+  "bookingReference": "",
+  "source": "manual"
+}

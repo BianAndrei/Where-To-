@@ -1,0 +1,56 @@
+.brand.brand-artwork {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  line-height: 0;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.brand-artwork .brand-graphic {
+  display: block;
+  flex-shrink: 0;
+  height: auto;
+  overflow: hidden;
+}
+.brand-artwork .brand-graphic--mark {
+  width: 56px;
+}
+.brand-artwork .brand-graphic--name {
+  width: 127px;
+}
+.brand-artwork.small .brand-graphic--mark {
+  width: 46px;
+}
+.brand-artwork.small .brand-graphic--name {
+  width: 106px;
+}
+.brand.brand-artwork--stacked {
+  display: block;
+  width: 170px;
+}
+.brand-artwork .brand-graphic--stacked {
+  width: 100%;
+}
+.wt-footer > div:first-child {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.wt-footer > div:first-child > p {
+  text-align: center;
+  margin-top: 15px;
+}
+@media (max-width: 640px) {
+  .brand-artwork .brand-graphic--mark {
+    width: 49px;
+  }
+  .brand-artwork .brand-graphic--name {
+    width: 116px;
+  }
+  .brand.brand-artwork {
+    gap: 7px;
+  }
+  .brand.brand-artwork--stacked {
+    width: 150px;
+  }
+}

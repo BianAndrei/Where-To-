@@ -1,0 +1,47 @@
+{
+  "name": "@whereto/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/server.ts",
+    "worker": "tsx watch --env-file=../../.env src/worker.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "tsx src/server.ts",
+    "db:generate": "node --env-file=../../.env ../../node_modules/prisma/build/index.js generate",
+    "db:migrate": "node --env-file=../../.env ../../node_modules/prisma/build/index.js migrate deploy"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.922.0",
+    "@aws-sdk/s3-request-presigner": "^3.922.0",
+    "@fontsource/nunito": "^5.3.0",
+    "@napi-rs/canvas": "^1.0.8",
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@prisma/client": "^6.12.0",
+    "@whereto/shared": "*",
+    "better-auth": "^1.3.34",
+    "cheerio": "^1.1.2",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
+    "groq-sdk": "^0.37.0",
+    "helmet": "^8.1.0",
+    "multer": "^2.0.2",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289",
+    "pg": "^8.16.3",
+    "pg-boss": "^10.3.2",
+    "pino": "^9.14.0",
+    "robots-parser": "^3.0.1",
+    "sharp": "^0.35.4",
+    "stripe": "^22.6.1",
+    "tesseract.js": "^6.0.1",
+    "undici": "^7.16.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/multer": "^2.0.0",
+    "@types/pg": "^8.15.6",
+    "prisma": "^6.12.0"
+  }
+}

@@ -1,0 +1,67 @@
+import { chromium, webkit, expect } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+
+const origin = process.env.PRESENTATION_URL || 'http://127.0.0.1:4173';
+const base = `${origin}/client-sites/whereto`;
+const output = 'artifacts/blueprint-presentation';
+await mkdir(output, { recursive: true });
+const report = [];
+for (const [name, engine, width] of [['desktop', chromium, 1440], ['mobile', webkit, 390]]) {
+  const browser = await engine.launch();
+  const page = await browser.newPage({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' });
+  const errors = [], missing = [], apiRequests = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('response', response => {
+    if (response.url().startsWith(base) && response.status() >= 400) missing.push(`${response.status()} ${response.url()}`);
+  });
+  page.on('request', request => {
+    if (request.url().includes('/api/') && request.frame()?.url().startsWith(base)) apiRequests.push(request.url());
+  });
+  await page.goto(`${base}/index.html`);
+  await expect(page.getByRole('heading', { name: 'A lovely trip. A clear budget.' })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/client-sites/whereto/');
+  await page.screenshot({ path: `${output}/${name}-landing.png` });
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page.getByRole('link', { name: 'Simple pricing', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /Start free/ })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/client-sites/whereto/pricing');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: /Start free/ })).toBeVisible();
+  await page.goto(`${base}/`);
+  await page.getByRole('link', { name: 'Try the planner first', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Lisbon, together', exact: true })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/client-sites/whereto/demo');
+  await page.getByRole('button', { name: 'Add to your day', exact: true }).click();
+  await page.getByRole('button', { name: 'Add expense', exact: true }).click();
+  await page.getByLabel('What was it for?', { exact: true }).fill('Presentation coffee');
+  await page.getByLabel('Group cost (EUR)', { exact: true }).fill('18');
+  await page.getByRole('button', { name: 'Save to my trip', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Lisbon, together', exact: true })).toBeVisible();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('whereto-demo')).state.items.some(item => item.title === 'Presentation coffee'));
+  expect(saved).toBe(true);
+  await page.getByRole('button', { name: 'Open help and tutorials', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.screenshot({ path: `${output}/${name}-guide.png` });
+  await page.goto(`${base}/app/settings/`);
+  await expect(page.getByRole('heading', { name: /Your next adventure/ })).toBeVisible();
+  expect(await page.locator('input[type="password"]').count()).toBe(0);
+  expect(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.goto(`${origin}/portfolio/preview/whereto`);
+  await expect(page.getByRole('dialog', { name: 'Cookie consent', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open menu', exact: true })).toHaveCount(0);
+  const frame = page.frameLocator('iframe[title="Whereto live preview"]');
+  await expect(frame.getByRole('heading', { name: 'A lovely trip. A clear budget.' })).toBeVisible({ timeout: 20000 });
+  await frame.getByRole('link', { name: 'Try the planner first', exact: true }).click();
+  await expect(frame.getByRole('heading', { name: 'Lisbon, together', exact: true })).toBeVisible();
+  await page.screenshot({ path: `${output}/${name}-blueprint-preview.png` });
+  expect(apiRequests).toEqual([]);
+  expect(missing).toEqual([]);
+  expect(errors).toEqual([]);
+  report.push({ browser: name, width, containedRoutes: true, reload: true, persistedExpense: true, iframe: true, noApiCalls: true, missingAssets: missing, errors });
+  await browser.close();
+}
+await writeFile(`${output}/report.json`, JSON.stringify(report, null, 2));
+console.log(JSON.stringify(report, null, 2));

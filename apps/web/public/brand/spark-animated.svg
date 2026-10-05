@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="doodle doodle-spark doodle-flow  " viewBox="0 0 110 110" fill="none" aria-hidden="true"><path class="paint-splat" d="M43 12C52 2 70 18 78 22C94 17 100 37 91 51C104 68 85 85 73 84C63 105 40 92 34 83C17 91 2 71 13 55C-1 36 19 22 32 23Z" fill="#FFD69A" transform="translate(5 3)"></path><g stroke="#292823" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round" class="ink-drawing"><path class="spark-main" d="M51 23C55 44 61 50 81 54C61 58 55 64 51 85C47 64 41 58 21 54C41 50 47 44 51 23Z" fill="#FFD69A"></path><path class="spark-small" d="M84 14C86 23 88 25 97 27C88 29 86 31 84 40C82 31 80 29 71 27C80 25 82 23 84 14Z" fill="#E8ACA0" stroke-width="3.1"></path></g><style>/* Also embedded in downloadable SVGs by scripts/brand-assets.ts. */
+.doodle-flow .ink-drawing {
+  animation: none;
+}
+.doodle-flow .paint-splat {
+  transform-origin: 55px 55px;
+  animation: pigment-flow 8s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+.doodle-flow .pin-drop {
+  animation: pin-arrive 4.8s cubic-bezier(0.34, 1.4, 0.64, 1) infinite;
+  transform-origin: 55px 85px;
+}
+.doodle-flow .pin-ground {
+  animation: pin-shadow 4.8s cubic-bezier(0.34, 1.4, 0.64, 1) infinite;
+  transform-origin: 55px 87px;
+}
+.doodle-flow .wallet-coin {
+  animation: save-coin 5s cubic-bezier(0.45, 0, 0.3, 1) infinite;
+}
+.doodle-flow .suitcase-stamp {
+  transform-origin: 55px 59px;
+  animation: stamp-turn 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.doodle-flow .train-cabin {
+  transform-origin: 55px 78px;
+  animation: train-travel 3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.doodle-flow .meal-steam path {
+  animation: steam-rise 3.6s cubic-bezier(0.3, 0, 0.5, 1) infinite;
+}
+.doodle-flow .meal-steam .steam-two {
+  animation-delay: -0.8s;
+}
+.doodle-flow .meal-steam .steam-three {
+  animation-delay: -1.6s;
+}
+.doodle-flow .sun-rays {
+  transform-origin: 55px 55px;
+  animation: sunshine-turn 10s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+.doodle-flow .sun-face {
+  transform-origin: 55px 52px;
+  animation: sunshine-blink 6s linear infinite;
+}
+.doodle-flow .paper-flight {
+  transform-origin: 55px 55px;
+  animation: paper-glide 6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.doodle-flow .plane-trail,
+.doodle-flow .draw-route {
+  animation: ink-route 5s linear infinite;
+}
+.doodle-flow .spark-main {
+  transform-origin: 51px 54px;
+  animation: star-turn 6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.doodle-flow .spark-small {
+  transform-origin: 84px 27px;
+  animation: star-turn 6s cubic-bezier(0.45, 0, 0.55, 1) -2s infinite;
+}
+@keyframes pigment-flow {
+  from {
+    transform: translate(4px, 3px) rotate(-2deg) scale(0.99, 1.01);
+  }
+  to {
+    transform: translate(5px, 2px) rotate(3deg) scale(1.02, 0.98);
+  }
+}
+@keyframes pin-arrive {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-7px);
+  }
+  57% {
+    transform: translateY(1px) scale(1.03, 0.97);
+  }
+}
+@keyframes pin-shadow {
+  0%,
+  70%,
+  100% {
+    transform: scaleX(1);
+    opacity: 0.12;
+  }
+  35% {
+    transform: scaleX(0.7);
+    opacity: 0.06;
+  }
+}
+@keyframes save-coin {
+  0%,
+  12% {
+    transform: translateY(1px);
+  }
+  43%,
+  64% {
+    transform: translateY(28px);
+  }
+  65% {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  66% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  83%,
+  100% {
+    opacity: 1;
+    transform: translateY(1px);
+  }
+}
+@keyframes stamp-turn {
+  0%,
+  20%,
+  100% {
+    transform: rotate(0);
+  }
+  60%,
+  80% {
+    transform: rotate(90deg);
+  }
+}
+@keyframes train-travel {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  25% {
+    transform: translateY(-1.5px) rotate(-1.2deg);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  75% {
+    transform: translateY(-1.5px) rotate(1.2deg);
+  }
+}
+@keyframes steam-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  25%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-9px);
+  }
+}
+@keyframes sunshine-turn {
+  to {
+    transform: rotate(35deg);
+  }
+}
+@keyframes sunshine-blink {
+  0%,
+  44%,
+  49%,
+  100% {
+    transform: scaleY(1);
+  }
+  46% {
+    transform: scaleY(0.14);
+  }
+}
+@keyframes paper-glide {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0);
+  }
+  45% {
+    transform: translate(3px, -4px) rotate(-5deg);
+  }
+  75% {
+    transform: translate(-2px, 1px) rotate(2deg);
+  }
+}
+@keyframes ink-route {
+  to {
+    stroke-dashoffset: -45;
+  }
+}
+@keyframes star-turn {
+  0%,
+  20%,
+  100% {
+    transform: scale(1) rotate(0);
+  }
+  55% {
+    transform: scale(0.85) rotate(15deg);
+  }
+  75% {
+    transform: scale(1.04) rotate(-4deg);
+  }
+}
+.motion-paused .doodle *,
+.motion-paused .postcard-path {
+  animation-play-state: paused !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .doodle *,
+  .postcard-path {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+</style></svg>

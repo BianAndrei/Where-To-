@@ -1,0 +1,611 @@
+/* Whereto's interaction language: soft paper, responsive controls, springy ink.
+   State-driven transitions can reverse immediately; no scroll interception. */
+:root {
+  --motion-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-flow: cubic-bezier(0.32, 0.72, 0, 1);
+  --motion-spring: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-quick: 160ms;
+  --motion-settle: 280ms;
+}
+
+:root :is(button, a.button, .new-trip-card, .trip-bottom a) {
+  transition:
+    background-color var(--motion-quick) var(--motion-out),
+    border-color var(--motion-quick) var(--motion-out),
+    color var(--motion-quick) var(--motion-out),
+    box-shadow var(--motion-settle) var(--motion-out),
+    opacity var(--motion-quick) var(--motion-out);
+}
+:root :is(.button, .icon-button, .people-counter > button, .add-stop) {
+  transition:
+    scale 160ms var(--motion-out),
+    translate 220ms var(--motion-out),
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 220ms ease;
+}
+:root
+  :is(.button, .icon-button, .people-counter > button, .add-stop):active:not(
+    :disabled
+  ) {
+  scale: 0.975;
+  translate: 0 0;
+  transition-duration: 100ms;
+}
+:root .button:active:not(:disabled) {
+  transform: none;
+}
+:root :is(button, .button):disabled {
+  scale: 1;
+  translate: none;
+  transform: none;
+}
+:root :is(button, a):focus-visible {
+  transition-duration: 0ms;
+}
+.button-loading-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* A panel has one entrance and one exit. Only bounded expanding surfaces
+   measure their height; long pages and maps keep natural document flow. */
+.motion-panel,
+.motion-panel-viewport,
+.motion-panel-content {
+  min-width: 0;
+}
+.motion-panel-viewport {
+  position: relative;
+}
+.motion-panel-viewport[data-resize="true"] {
+  overflow: clip;
+  overflow-clip-margin: 6px;
+}
+.motion-panel-content {
+  display: flow-root;
+  width: 100%;
+}
+.motion-panel-content[data-present="false"] {
+  pointer-events: none;
+  user-select: none;
+}
+.booking-story-next > .motion-panel-viewport {
+  width: 100%;
+}
+.booking-story-next .motion-panel-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+@media (max-width: 600px) {
+  .booking-story-next .motion-panel-content {
+    flex-wrap: wrap;
+  }
+}
+:root .button[aria-busy="true"] {
+  cursor: progress;
+  opacity: 0.78;
+}
+
+/* The selected surface moves between controls instead of blinking on/off. */
+:root button.motion-choice {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  overflow: visible;
+}
+:root button.motion-choice.active {
+  background: transparent;
+  box-shadow: none;
+}
+.motion-selection {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--selection-fill, #fffdf8);
+  box-shadow: var(--selection-shadow, 0 2px 5px #2928230b);
+}
+:root .motion-nav-link {
+  position: relative;
+  isolation: isolate;
+  --selection-fill: #cde5d4;
+  --selection-shadow: none;
+}
+:root .motion-nav-link.active {
+  background: transparent;
+}
+.motion-nav-link > svg {
+  transition: transform 320ms var(--motion-spring);
+}
+.planner-sidebar nav,
+.mobile-app-nav {
+  --selection-fill: #eee9dd;
+  --selection-shadow: none;
+}
+.day-tabs {
+  --selection-fill: #f4dfbc;
+  --selection-shadow: 0 2px 8px #2928230c;
+}
+.choice-row,
+.module-choices {
+  --selection-fill: #eef3e9;
+  --selection-shadow: none;
+}
+.module-choices > button > .module-label {
+  flex: 1;
+}
+.module-choices > button > .motion-selection {
+  flex: none;
+}
+.wt-tool-tabs {
+  --selection-fill: #fffdf8;
+}
+.wt-payment-choices {
+  --selection-fill: #cde5d4;
+  --selection-shadow: none;
+}
+.menu-sample-heading [role="group"] {
+  --selection-fill: #292823;
+  --selection-shadow: none;
+}
+.motion-choice > svg,
+.motion-choice > .doodle {
+  transition: transform 350ms var(--motion-spring);
+}
+.motion-choice.active > svg {
+  transform: scale(1.04);
+}
+.wt-tool-tabs .motion-selection {
+  border: 1px solid #ded5c6;
+}
+.wt-tool-tabs button > .motion-selection {
+  flex: none;
+}
+.wt-tool-tabs button > svg:last-child {
+  transition:
+    opacity 180ms var(--motion-out),
+    transform 350ms var(--motion-spring);
+}
+.wt-tool-tabs button[aria-selected="true"] > svg:last-child {
+  transform: translateX(2px);
+}
+:root :is(.rolling-value, .rolling-visual, .rolling-visual span) {
+  position: relative;
+  display: inline-block;
+  vertical-align: baseline;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+  margin: 0;
+}
+.rolling-visual {
+  overflow: clip;
+  overflow-clip-margin: 2px;
+}
+:root .rolling-digit {
+  overflow: clip;
+  overflow-clip-margin: 1px;
+}
+:root .rolling-digit[data-numeric="true"] {
+  width: 1ch;
+  text-align: center;
+}
+
+/* Nested components share the same tactile response. Fine-pointer hovers never
+   become sticky on touch screens, and drag handles retain their own transforms. */
+@media (hover: hover) and (pointer: fine) {
+  :root .button:hover:not(:disabled) {
+    transform: none;
+    translate: 0 -1px;
+    box-shadow: 0 4px 10px #29282310;
+  }
+  :root .button-ghost:hover:not(:disabled) {
+    box-shadow: none;
+  }
+  :root .icon-button:hover:not(:disabled) {
+    scale: 1.04;
+  }
+  :root
+    :is(.planner-sidebar nav button, .wt-tool-tabs button):hover:not(:disabled)
+    > svg {
+    transform: translateY(-1px) scale(1.04);
+  }
+  :root .trip-card:hover {
+    translate: 0 -3px;
+    box-shadow: 0 14px 30px #2928230e;
+  }
+  :root .new-trip-card:hover {
+    translate: 0 -3px;
+    background-color: #f4f6ec;
+  }
+  .new-trip-card:hover .new-trip-plus {
+    transform: rotate(90deg) scale(1.04);
+  }
+  .trip-bottom a:hover {
+    transform: translate(2px, -2px);
+  }
+  .item-card:hover .item-doodle {
+    transform: rotate(-3deg) scale(1.03);
+  }
+  :root .add-stop:hover {
+    background: #f8eddb;
+    border-color: #b59673;
+  }
+  .add-stop:hover > svg {
+    transform: scale(1.12);
+  }
+  .price-card:hover .fare-top > .doodle {
+    transform: translateY(-4px) rotate(-6deg);
+  }
+  :root .wt-hero-secondary:hover > span {
+    transform: scale(1.1) rotate(-6deg);
+  }
+  :root
+    :is(.wt-inline-link, .wt-final-demo, .text-link, .wt-nav-actions > a):hover
+    > svg {
+    transform: translate(3px, -2px);
+  }
+  .motion-nav-link:hover > svg {
+    transform: translateY(-1px) scale(1.04);
+  }
+}
+.trip-card {
+  transition:
+    translate 400ms var(--motion-spring),
+    box-shadow 350ms var(--motion-out);
+}
+:is(
+  .new-trip-plus,
+  .item-doodle,
+  .add-stop > svg,
+  .fare-top > .doodle,
+  .wt-hero-secondary > span,
+  .wt-inline-link > svg,
+  .text-link > svg,
+  .wt-nav-actions > a > svg
+) {
+  transition: transform 400ms var(--motion-spring);
+}
+.itinerary-item[data-dragging="true"] {
+  position: relative;
+  z-index: 5;
+}
+.timeline {
+  position: relative;
+}
+.planner-view {
+  min-width: 0;
+}
+.location-results {
+  transform-origin: top center;
+}
+@media (max-width: 850px) {
+  .itinerary-layout {
+    view-transition-name: planner-surface;
+  }
+}
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-group(root),
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-group(planner-surface) {
+  animation-duration: 280ms;
+  animation-timing-function: var(--motion-flow);
+}
+::view-transition-old(planner-surface) {
+  animation: wt-surface-leave 120ms var(--motion-out) both;
+}
+::view-transition-new(planner-surface) {
+  animation: wt-surface-arrive 240ms var(--motion-out) both;
+}
+@keyframes wt-surface-leave {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes wt-surface-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.location-results button > svg {
+  transition:
+    transform 300ms var(--motion-spring),
+    opacity 180ms var(--motion-out);
+}
+.location-results button:hover > svg:first-child {
+  transform: translateY(-2px) rotate(-8deg);
+}
+.booking-story-progress li > span {
+  transition:
+    background-color 280ms var(--motion-out),
+    scale 350ms var(--motion-spring);
+}
+.booking-story-progress li[aria-current="step"] > span {
+  scale: 1.12;
+}
+.booking-story-progress li[data-complete="true"] > span {
+  background: #cde5d4;
+}
+.destination-chips > span {
+  animation: wt-check-in 280ms var(--motion-spring);
+}
+@keyframes wt-feedback-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+.itinerary-item[data-dragging="true"] .item-card {
+  box-shadow: 0 14px 30px #29282320;
+  border-color: #a6b49a;
+  rotate: -1deg;
+}
+.item-card {
+  transition:
+    border-color 180ms var(--motion-out),
+    background-color 180ms var(--motion-out),
+    box-shadow 250ms var(--motion-out),
+    rotate 250ms var(--motion-out);
+}
+.drag-handle {
+  touch-action: none;
+}
+
+/* Focus, selections, checkmarks and completed checklist text. */
+:root :is(input, textarea, .wt-select-trigger) {
+  transition:
+    border-color 180ms var(--motion-out),
+    background-color 180ms var(--motion-out),
+    box-shadow 250ms var(--motion-out);
+}
+:root
+  :is(
+    input:not([type="checkbox"]),
+    textarea,
+    .wt-select-trigger
+  ):focus-visible {
+  box-shadow: 0 0 0 4px #c8837714;
+}
+:root input[type="checkbox"] {
+  transition:
+    background-color 180ms var(--motion-out),
+    border-color 180ms var(--motion-out),
+    scale 300ms var(--motion-spring);
+}
+:root input[type="checkbox"]::before {
+  transition:
+    transform 320ms var(--motion-spring),
+    opacity 130ms var(--motion-out);
+}
+:root input[type="checkbox"]:active {
+  scale: 0.85;
+}
+:root .checkbox-label {
+  transition: color 220ms var(--motion-out);
+}
+.checklist-text {
+  position: relative;
+}
+.checklist-text::after {
+  content: "";
+  position: absolute;
+  top: 52%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 280ms var(--motion-out);
+}
+.checkbox-label.done {
+  text-decoration: none;
+}
+.checkbox-label.done .checklist-text::after {
+  transform: scaleX(1);
+}
+.checklist-row {
+  border-radius: 10px;
+  transition: background-color 200ms var(--motion-out);
+}
+.checklist-row:has(input:checked) {
+  background: #cde5d41f;
+}
+.checklist-progress {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 20px 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #68765c;
+}
+.checklist-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: #e9e8dc;
+}
+.checklist-progress-track > span {
+  display: block;
+  height: 100%;
+  background: #8cae88;
+  transform-origin: left;
+  transition: transform 420ms var(--motion-out);
+}
+
+/* Portals retain Radix focus handling and animate from the trigger's origin. */
+:root .modal-overlay {
+  animation: none;
+}
+:root .wt-select-content {
+  animation: wt-popover-in 200ms var(--motion-out);
+}
+:root .wt-select-content[data-state="closed"] {
+  animation: wt-popover-out 140ms var(--motion-out);
+}
+:root .wt-select-chevron {
+  transition: transform 350ms var(--motion-spring);
+}
+:root .wt-select-option {
+  transition:
+    background-color 140ms var(--motion-out),
+    color 140ms var(--motion-out);
+}
+.wt-select-check {
+  animation: wt-check-in 280ms var(--motion-spring);
+}
+@keyframes wt-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes wt-popover-out {
+  to {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.985);
+  }
+}
+@keyframes wt-check-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7) rotate(-12deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+/* Arrival feedback is short and finite; loading motion stops when loading ends. */
+.page-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.journey-loader {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 32px;
+}
+.journey-loader i {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  background: #cde5d4;
+  animation: wt-pack 1s var(--motion-out) infinite;
+}
+.journey-loader i:nth-child(2) {
+  background: #ffd69a;
+  animation-delay: 0.12s;
+}
+.journey-loader i:nth-child(3) {
+  background: #e8aca0;
+  animation-delay: 0.24s;
+}
+@keyframes wt-pack {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  35% {
+    transform: translateY(-8px) rotate(12deg);
+  }
+}
+.save-status[data-saving="true"] svg {
+  animation: spin 900ms linear infinite;
+}
+.save-status[data-saving="false"] svg {
+  animation: wt-check-in 320ms var(--motion-spring);
+}
+.save-status {
+  font-variant-numeric: tabular-nums;
+}
+.onboarding-progress > div > span {
+  transition:
+    background-color 300ms var(--motion-out),
+    color 250ms var(--motion-out),
+    scale 400ms var(--motion-spring);
+}
+.onboarding-progress > div[aria-current="step"] > span {
+  scale: 1.1;
+  box-shadow: 0 0 0 5px #cde5d43b;
+}
+
+/* Accessible interaction always takes precedence over decoration. */
+html[data-input="keyboard"]
+  :is(
+    button,
+    a,
+    input,
+    textarea,
+    details,
+    .mobile-tools-chevron,
+    .motion-selection,
+    .checklist-progress-track > span,
+    .checklist-text::after
+  ) {
+  transition-duration: 0ms !important;
+}
+html[data-input="keyboard"] :is(.wt-select-content, .wt-select-check) {
+  animation: none !important;
+}
+@media (hover: none) {
+  :root .button:hover:not(:disabled) {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+  :root :is(button, a.button, .trip-card, .new-trip-card):is(:hover, :active) {
+    scale: 1;
+    translate: none;
+    rotate: none;
+    transform: none;
+  }
+}
+@media print {
+  .route-arrival,
+  .motion-panel {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
