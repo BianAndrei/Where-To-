@@ -414,6 +414,9 @@
     gap: 8px;
     align-items: center;
   }
+  :root .planner-header-actions .trip-search-trigger {
+    display: none;
+  }
   :root .planner-header-actions .button {
     min-height: 44px;
     min-width: 44px;
@@ -451,6 +454,25 @@
   :root .mobile-tools {
     margin: 12px var(--mobile-gutter) 10px;
     border-radius: 13px;
+  }
+  :root .planner .mobile-app-nav .mobile-tools-dropdown {
+    align-self: stretch;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+  :root .planner .mobile-app-nav .mobile-tools-dropdown > summary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    height: 54px;
+    min-height: 54px;
+    padding: 8px 3px;
+    font-size: 10px;
+    line-height: normal;
   }
   :root .mobile-tools > summary {
     min-height: 54px;

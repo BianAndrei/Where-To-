@@ -489,6 +489,24 @@
   color: #827a66;
   margin-top: 3px;
 }
+.trip-search-result-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.trip-search-result-categories > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eeefdf;
+  color: #6f7759;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+}
 .trip-search-result-icon {
   display: grid;
   place-items: center;

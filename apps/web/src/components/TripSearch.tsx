@@ -14,14 +14,8 @@ import {
   useInstantMotion,
   useMotionTrigger,
 } from "./motion";
-
-export function searchText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase()
-    .trim();
-}
+import { matchesTripSearch, tripSearchCategories } from "../lib/trip-search";
+export { searchText } from "../lib/trip-search";
 export default function TripSearch({
   items,
   onSelect,
@@ -36,13 +30,7 @@ export default function TripSearch({
   const handoff = useRef(false);
   const motionTrigger = useMotionTrigger();
   const instant = useInstantMotion();
-  const matches = items.filter(
-    (item) =>
-      !item.deletedAt &&
-      searchText(
-        `${item.title} ${item.location?.name ?? ""} ${item.category}`,
-      ).includes(searchText(query)),
-  );
+  const matches = items.filter((item) => matchesTripSearch(item, query));
   return (
     <Popover.Root
       open={open}
@@ -101,7 +89,7 @@ export default function TripSearch({
                     ref={input}
                     type="search"
                     aria-label="Find a stop in your trip"
-                    placeholder="A place, a booking, a plan…"
+                    placeholder="A place, booking, or category…"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                   />
@@ -147,21 +135,29 @@ export default function TripSearch({
                                   day: "numeric",
                                   month: "short",
                                 })
-                              : "Unscheduled"}{" "}
-                          · {item.location?.name || item.category}
+                              : "Unscheduled"}
+                          {item.location?.name
+                            ? ` · ${item.location.name}`
+                            : ""}
                         </small>
+                        <span className="trip-search-result-categories">
+                          {tripSearchCategories(item).map((category) => (
+                            <span key={category}>{category}</span>
+                          ))}
+                        </span>
                       </span>
                       <ArrowUpRight size={17} aria-hidden="true" />
                     </button>
                   ))}
                   {!matches.length && (
                     <p className="trip-search-empty">
-                      No plans found. Try a place or booking name.
+                      No plans found. Try a place, booking, category, or
+                      receipt.
                     </p>
                   )}
                 </div>
                 <p className="trip-search-hint">
-                  Searches every day of this trip, including your ideas.
+                  Search by place, booking, category, or attached receipt.
                 </p>
               </motion.div>
             </Popover.Content>

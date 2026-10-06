@@ -179,7 +179,7 @@
     margin-left: 0;
   }
   .planner .mobile-app-nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) 44px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     padding: 5px 12px;
     gap: 3px;
   }
@@ -189,20 +189,6 @@
     padding: 8px 3px;
     min-height: 54px;
     color: #7b6b50;
-  }
-  .planner .mobile-app-nav .nav-density-toggle {
-    align-self: center;
-    width: 44px;
-    height: 44px;
-    min-height: 44px;
-    border: 1px solid #e4dccd;
-    border-radius: 10px;
-  }
-  .planner.nav-compact .mobile-app-nav .nav-label {
-    display: none;
-  }
-  .planner.nav-compact .mobile-app-nav button {
-    min-height: 44px;
   }
   .mobile-app-nav {
     view-transition-name: mobile-navigation;

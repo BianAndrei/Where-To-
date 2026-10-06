@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { makeDemo } from "../apps/web/src/lib/demo";
 import {
   applyCommand,
@@ -30,6 +30,21 @@ const fixture = () => {
   return s;
 };
 describe("Reservation imports, decisions and receipts", () => {
+  it("generates UUIDs when randomUUID is unavailable", () => {
+    const crypto = globalThis.crypto;
+    vi.stubGlobal("crypto", {
+      getRandomValues: crypto.getRandomValues.bind(crypto),
+    });
+
+    try {
+      expect(makeId()).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("extracts explicit hotel dates, cost and reference without treating the total as a payment", () => {
     const s = fixture();
     const result = parseReservationText(

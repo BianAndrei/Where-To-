@@ -14,7 +14,7 @@ test.afterEach(async ({ page }) => {
 
 async function openChecklist(page: Page, mobile: boolean) {
   if (mobile) {
-    await page.locator(".mobile-tools > summary").click();
+    await page.locator(".mobile-tools-dropdown > summary").click();
     await page
       .locator(".mobile-tools")
       .getByRole("button", { name: "Checklist", exact: true })

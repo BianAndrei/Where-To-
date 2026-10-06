@@ -1,15 +1,26 @@
-import { test, expect } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 test.use({ serviceWorkers: "block" });
 
 test("returning from the demo renders the landing page", async ({ page }) => {
-  await page.goto("/demo");
-  await page.getByRole("link", { name: "Back to Whereto" }).click();
+  await page.goto("/");
+  await page.getByRole("link", { name: "Try the planner first" }).click();
+  await expect(page).toHaveURL("/demo");
+  await page.goBack();
   await expect(page).toHaveURL("/");
   await expect(
     page.getByRole("heading", { name: "A lovely trip. A clear budget." }),
   ).toBeVisible();
   await expect(page.locator(".planner")).toHaveCount(0);
+});
+
+test("the mobile planner CTA opens the interactive demo", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Try the planner first" }).click();
+  await expect(page).toHaveURL("/demo");
+  await expect(page.locator(".demo-banner")).toContainText(
+    "You’re exploring an example trip",
+  );
 });
 
 test("navigation compacts, keeps every view usable and remembers the preference", async ({
@@ -20,48 +31,133 @@ test("navigation compacts, keeps every view usable and remembers the preference"
   const navigation = page.locator(
     isMobile ? ".mobile-app-nav" : ".planner-sidebar",
   );
-  const before = await navigation.boundingBox();
-  await navigation
-    .getByRole("button", { name: "Compact navigation", exact: true })
-    .click();
-  await expect(page.locator(".planner")).toHaveClass(/nav-compact/);
-  const expanded = navigation.getByRole("button", {
-    name: "Expand navigation",
-    exact: true,
-  });
-  await expect(expanded).toHaveAttribute("aria-pressed", "true");
-  const after = await navigation.boundingBox();
-  expect(isMobile ? after!.height : after!.width).toBeLessThan(
-    isMobile ? before!.height : before!.width,
+  let expanded: Locator | undefined;
+  if (!isMobile) {
+    const before = await navigation.boundingBox();
+    await navigation
+      .getByRole("button", { name: "Compact navigation", exact: true })
+      .click();
+    await expect(page.locator(".planner")).toHaveClass(/nav-compact/);
+    expanded = navigation.getByRole("button", {
+      name: "Expand navigation",
+      exact: true,
+    });
+    await expect(expanded).toHaveAttribute("aria-pressed", "true");
+    const after = await navigation.boundingBox();
+    expect(after!.width).toBeLessThan(before!.width);
+  } else {
+    const searchButton = navigation.getByRole("button", {
+      name: "Search this trip",
+    });
+    const toolsButton = navigation.locator(".mobile-tools-dropdown > summary");
+    await expect(searchButton).toBeVisible();
+    await expect(toolsButton).toBeVisible();
+    expect((await toolsButton.boundingBox())?.height).toBe(
+      (await searchButton.boundingBox())?.height,
+    );
+    await expect(toolsButton).toHaveCSS("font-size", "10px");
+    await expect(
+      page.locator(".mobile-tools:not(.mobile-tools-dropdown)"),
+    ).toHaveCount(0);
+  }
+  await navigation.getByRole("button", { name: "Budget", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "The numbers, together." }),
+  ).toBeVisible();
+  await expect(page.locator(".budget-stats strong").first()).toHaveCSS(
+    "text-align",
+    "center",
   );
+  await navigation
+    .getByRole("button", { name: "Itinerary", exact: true })
+    .click();
+  await expect(
+    page.locator(".itinerary-controls .day-tabs button").first(),
+  ).toBeVisible();
   await navigation.getByRole("button", { name: "Budget", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "The numbers, together." }),
   ).toBeVisible();
   await page.reload();
-  await expect(expanded).toBeVisible();
-  expect(
-    await page.evaluate(() => localStorage.getItem("whereto-nav-compact")),
-  ).toBe("true");
 
   if (isMobile) {
-    await navigation
-      .getByRole("button", { name: "Details", exact: true })
-      .click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page
-      .getByRole("button", { name: "Close dialog", exact: true })
-      .click();
-    await page.locator(".mobile-tools > summary").click();
+    await page.evaluate(() =>
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" }),
+    );
+    await expect(navigation).toBeInViewport();
+    const searchButton = navigation.getByRole("button", {
+      name: "Search this trip",
+    });
+    await searchButton.click();
+    const search = page.getByRole("searchbox", {
+      name: "Find a stop in your trip",
+    });
+    await expect(search).toBeVisible();
+    await search.fill("transport");
+    await expect(page.locator(".trip-search-results > button")).toContainText(
+      "Flights to Lisbon",
+    );
+    await page.getByRole("button", { name: "Close trip search" }).click();
+
+    const toolsButton = navigation.locator(".mobile-tools-dropdown > summary");
+    await toolsButton.click();
+    await expect(navigation.locator(".mobile-tools-dropdown")).toHaveAttribute(
+      "open",
+      "",
+    );
+    await expect(
+      page.locator(".mobile-tools").getByRole("button", { name: "History" }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator(".mobile-tools")
+        .getByRole("button", { name: "Trip settings" }),
+    ).toBeVisible();
+    const toolsMenu = page.locator(".mobile-tools-grid");
+    await expect(toolsMenu).toHaveCSS(
+      "animation-name",
+      "mobile-tools-paper-unroll",
+    );
+    await expect(toolsMenu).toHaveCSS("animation-duration", "0.76s");
+    await expect(toolsMenu).toHaveCSS("border-radius", "16px");
+    expect(
+      await toolsMenu.evaluate(
+        (element) => getComputedStyle(element, "::before").animationName,
+      ),
+    ).toBe("mobile-tools-paper-edge");
     await page
       .locator(".mobile-tools")
       .getByRole("button", { name: "Import a booking", exact: true })
       .click();
+    await expect(
+      navigation.locator(".mobile-tools-dropdown"),
+    ).not.toHaveAttribute("open");
     await expect(page.getByRole("dialog")).toBeVisible();
     await page
       .getByRole("button", { name: "Close dialog", exact: true })
       .click();
+    await toolsButton.click();
+    await expect(navigation.locator(".mobile-tools-dropdown")).toHaveAttribute(
+      "open",
+      "",
+    );
+    await expect(toolsMenu).toBeVisible();
+    await expect(toolsMenu).toHaveCSS(
+      "animation-name",
+      "mobile-tools-paper-unroll",
+    );
+    await expect(toolsMenu).toHaveCSS("animation-duration", "0.76s");
+    expect(
+      await toolsMenu.evaluate(
+        (element) => getComputedStyle(element, "::before").animationName,
+      ),
+    ).toBe("mobile-tools-paper-edge");
+    await toolsButton.click();
   } else {
+    await expect(expanded).toBeVisible();
+    expect(
+      await page.evaluate(() => localStorage.getItem("whereto-nav-compact")),
+    ).toBe("true");
     const people = navigation.getByRole("button", {
       name: "People & essentials",
       exact: true,
@@ -95,12 +191,17 @@ test("navigation compacts, keeps every view usable and remembers the preference"
     await expect(menu).toBeHidden();
     await expect(people).toBeFocused();
   }
-  await expanded.click();
-  await expect(page.locator(".planner")).not.toHaveClass(/nav-compact/);
-  await page.reload();
-  await expect(
-    navigation.getByRole("button", { name: "Compact navigation", exact: true }),
-  ).toBeVisible();
+  if (!isMobile) {
+    await expanded!.click();
+    await expect(page.locator(".planner")).not.toHaveClass(/nav-compact/);
+    await page.reload();
+    await expect(
+      navigation.getByRole("button", {
+        name: "Compact navigation",
+        exact: true,
+      }),
+    ).toBeVisible();
+  }
 });
 
 test("Brand is unavailable and public navigation no longer links to it", async ({

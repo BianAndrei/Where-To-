@@ -1,5 +1,5 @@
 import { Select, SelectOption } from "../components/Select";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
   Navigate,
@@ -68,7 +68,6 @@ import {
   Globe,
   Train,
   SquaresFour,
-  CaretDown,
   SidebarSimple,
   UploadSimple,
   Receipt,
@@ -399,6 +398,17 @@ export default function Planner({
   }, [preferences.compactNav]);
   const toggleNav = () =>
     changeSurface(() => setCompactNav((compact) => !compact));
+  const mobileToolsDropdown = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      const dropdown = mobileToolsDropdown.current;
+      if (event.target instanceof Node && !dropdown?.contains(event.target))
+        dropdown && (dropdown.open = false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    return () =>
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+  }, []);
   const [day, setDay] = useState(""),
     [tool, setTool] = useState<Tool>(null),
     [editing, setEditing] = useState<TripItem | null>(null),
@@ -1034,104 +1044,110 @@ export default function Planner({
               <span className="nav-label">Ideas</span>
             </MotionChoice>
           </MotionGroup>
-          <button aria-label="Details" onClick={() => setTool("settings")}>
-            <GearSix size={20} />
-            <span className="nav-label">Details</span>
-          </button>
-          <button
-            type="button"
-            className="nav-density-toggle"
-            onClick={toggleNav}
-            aria-label={compactNav ? "Expand navigation" : "Compact navigation"}
-            aria-pressed={compactNav}
-          >
-            <SidebarSimple
-              size={20}
-              weight={compactNav ? "fill" : "regular"}
-              aria-hidden="true"
-            />
-          </button>
-        </nav>
-        {!shared?.public && (
-          <Disclosure className="mobile-tools">
-            <summary>
-              <SquaresFour size={22} aria-hidden="true" />
-              <span className="mobile-tools-label">
-                <strong>Trip tools</strong>
-                <span>People, documents & essentials</span>
-              </span>
-              <CaretDown
-                className="mobile-tools-chevron"
-                size={18}
-                aria-hidden="true"
-              />
-            </summary>
-            <div className="mobile-tools-grid">
-              <button
-                type="button"
-                disabled={readOnly || saving}
-                onClick={() => setPlanningTool("import")}
-              >
-                <UploadSimple size={21} aria-hidden="true" />
-                <span>Import a booking</span>
-              </button>
-              <button
-                type="button"
-                disabled={readOnly || saving}
-                onClick={() => setPlanningTool("receipt")}
-              >
-                <Receipt size={21} aria-hidden="true" />
-                <span>Split a receipt</span>
-              </button>
-              <button
-                type="button"
-                disabled={readOnly || saving}
-                onClick={() => setPlanningTool("polls")}
-              >
-                <UsersThree size={21} aria-hidden="true" />
-                <span>Group votes</span>
-              </button>
-              <button
-                type="button"
-                disabled={readOnly || saving}
-                onClick={() => {
-                  setTransferNeed(undefined);
-                  setPlanningTool("transfers");
+          {!shared?.public && (
+            <div className="mobile-nav-search">
+              <TripSearch items={state.items} onSelect={setEditing} />
+            </div>
+          )}
+          {!shared?.public && (
+            <details
+              ref={mobileToolsDropdown}
+              className="mobile-tools mobile-tools-dropdown"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.currentTarget.open = false;
+                  event.currentTarget.querySelector("summary")?.focus();
+                }
+              }}
+            >
+              <summary aria-controls="mobile-trip-tools">
+                <SquaresFour size={20} aria-hidden="true" />
+                <span className="nav-label">Tools</span>
+              </summary>
+              <div
+                id="mobile-trip-tools"
+                className="mobile-tools-grid"
+                onClick={(event) => {
+                  const target = event.target;
+                  if (
+                    target instanceof HTMLElement &&
+                    target.closest("button")
+                  ) {
+                    const details = event.currentTarget.closest("details");
+                    if (details) details.open = false;
+                  }
                 }}
               >
-                <Train size={21} aria-hidden="true" />
-                <span>Airport transfers</span>
-              </button>
-              <button
-                type="button"
-                aria-pressed={view === "today"}
-                onClick={() => setView("today")}
-              >
-                <Sun size={21} aria-hidden="true" />
-                <span>Today</span>
-              </button>
-              <button type="button" onClick={() => setTransitOpen(true)}>
-                <Train size={21} aria-hidden="true" />
-                <span>Trains</span>
-              </button>
-              {(
-                [
-                  ["people", "People", Users],
-                  ["checklist", "Checklist", CheckSquare],
-                  ["documents", "Documents", Files],
-                  ["history", "History", ClockCounterClockwise],
-                  ["trash", "Recently deleted", Trash],
-                  ["settings", "Settings", GearSix],
-                ] as const
-              ).map(([tool, label, Icon]) => (
-                <button type="button" key={tool} onClick={() => setTool(tool)}>
-                  <Icon size={21} aria-hidden="true" />
-                  <span>{label}</span>
+                <button
+                  type="button"
+                  disabled={readOnly || saving}
+                  onClick={() => setPlanningTool("import")}
+                >
+                  <UploadSimple size={21} aria-hidden="true" />
+                  <span>Import a booking</span>
                 </button>
-              ))}
-            </div>
-          </Disclosure>
-        )}
+                <button
+                  type="button"
+                  disabled={readOnly || saving}
+                  onClick={() => setPlanningTool("receipt")}
+                >
+                  <Receipt size={21} aria-hidden="true" />
+                  <span>Split a receipt</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={readOnly || saving}
+                  onClick={() => setPlanningTool("polls")}
+                >
+                  <UsersThree size={21} aria-hidden="true" />
+                  <span>Group votes</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={readOnly || saving}
+                  onClick={() => {
+                    setTransferNeed(undefined);
+                    setPlanningTool("transfers");
+                  }}
+                >
+                  <Train size={21} aria-hidden="true" />
+                  <span>Airport transfers</span>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={view === "today"}
+                  onClick={() => setView("today")}
+                >
+                  <Sun size={21} aria-hidden="true" />
+                  <span>Today</span>
+                </button>
+                <button type="button" onClick={() => setTransitOpen(true)}>
+                  <Train size={21} aria-hidden="true" />
+                  <span>Trains</span>
+                </button>
+                {(
+                  [
+                    ["people", "People", Users],
+                    ["checklist", "Checklist", CheckSquare],
+                    ["documents", "Documents", Files],
+                    ["history", "History", ClockCounterClockwise],
+                    ["trash", "Recently deleted", Trash],
+                    ["settings", "Trip settings", GearSix],
+                  ] as const
+                ).map(([tool, label, Icon]) => (
+                  <button
+                    type="button"
+                    key={tool}
+                    onClick={() => setTool(tool)}
+                  >
+                    <Icon size={21} aria-hidden="true" />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
+          )}
+        </nav>
         {!shared?.public && (
           <PlanningEssentials
             state={state}
@@ -1147,6 +1163,7 @@ export default function Planner({
           />
         )}
         <MotionPanel
+          key={view}
           changeKey={view}
           order={["itinerary", "today", "ideas", "budget"].indexOf(view)}
           distance={10}

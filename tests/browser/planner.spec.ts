@@ -250,8 +250,10 @@ test("expense rows are chronological and settlement needs confirmation", async (
 
 test("receipt saves to its meal and is searchable under the receipt filter", async ({
   page,
+  isMobile,
 }) => {
   await page.goto("/demo");
+  if (isMobile) await page.locator(".mobile-tools-dropdown > summary").click();
   await page
     .getByRole("button", { name: "Split a receipt", exact: true })
     .click();
@@ -263,6 +265,17 @@ test("receipt saves to its meal and is searchable under the receipt filter", asy
     "Receipt added to Dinner, with a view",
   );
   await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Search this trip" }).click();
+  await page
+    .getByRole("searchbox", { name: "Find a stop in your trip" })
+    .fill("receipts");
+  const receiptResult = page.locator(".trip-search-results > button");
+  await expect(receiptResult).toHaveCount(1);
+  await expect(receiptResult).toContainText("Dinner, with a view");
+  await expect(
+    receiptResult.locator(".trip-search-result-categories"),
+  ).toContainText("Receipt");
+  await page.getByRole("button", { name: "Close trip search" }).click();
   await page
     .getByRole("button", { name: "Budget", exact: true })
     .filter({ visible: true })
