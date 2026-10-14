@@ -15,6 +15,10 @@ if (mode === "clean") {
   if (!fixture.email.endsWith("@example.test"))
     throw new Error("Not a disposable fixture.");
   const ids = [fixture.id, fixture.travellerId];
+  await db.auditLog.deleteMany({
+    where: { OR: [{ actorId: { in: ids } }, { targetId: { in: ids } }] },
+  });
+  await db.loginEvent.deleteMany({ where: { userId: { in: ids } } });
   await db.adminAudit.deleteMany({ where: { actorId: { in: ids } } });
   await db.trip.deleteMany({ where: { ownerId: { in: ids } } });
   await db.user.deleteMany({ where: { id: { in: ids } } });

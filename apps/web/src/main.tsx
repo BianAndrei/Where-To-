@@ -68,6 +68,10 @@ function RouteArrival({
 }) {
   const location = useLocation();
   useEffect(() => {
+    if (location.pathname === "/demo")
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [location.pathname]);
+  useEffect(() => {
     // Load a destination when someone approaches its link. The route transition
     // can then settle into real content instead of a flash of a loading screen.
     const prepare = (event: Event) => {

@@ -7,22 +7,35 @@ import { randomUUID } from "node:crypto";
 
 export const ADMIN_READ_MS = 8 * 60 * 60 * 1000;
 export const ADMIN_WRITE_MS = 10 * 60 * 1000;
+export async function isAdminIdentity(userId: string) {
+  if (userId === process.env.ADMIN_OWNER_USER_ID) return true;
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  return user?.role === "admin";
+}
 export async function ownerSession(req: Request) {
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(req.headers),
   });
   assert(session, 401, "Sign in to your owner account.", "UNAUTHENTICATED");
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      role: true,
+      emailVerified: true,
+      twoFactorEnabled: true,
+    },
+  });
   assert(
-    process.env.ADMIN_OWNER_USER_ID &&
-      session.user.id === process.env.ADMIN_OWNER_USER_ID,
+    user &&
+      (user.id === process.env.ADMIN_OWNER_USER_ID || user.role === "admin"),
     403,
     "This account does not have admin access.",
     "ADMIN_FORBIDDEN",
   );
-  const user = await db.user.findUniqueOrThrow({
-    where: { id: session.user.id },
-    select: { id: true, emailVerified: true, twoFactorEnabled: true },
-  });
   assert(
     user.emailVerified,
     403,
@@ -30,7 +43,7 @@ export async function ownerSession(req: Request) {
     "EMAIL_UNVERIFIED",
   );
   await assertAccountActive(user.id);
-  return { ...session, user };
+  return { ...session, user: { ...session.user, ...user } };
 }
 export async function requireAdmin(
   req: Request,

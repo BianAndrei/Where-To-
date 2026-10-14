@@ -8,11 +8,20 @@ import { api, post, ApiError, type Features } from "../lib/api";
 export default function Pricing() {
   const nav = useNavigate();
   const [busy, setBusy] = useState("");
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: () => api<{ unlimitedOwner?: boolean }>("/me"),
+    retry: false,
+  });
   const config = useQuery({
     queryKey: ["config"],
     queryFn: () => api<Features>("/config"),
   });
   async function subscribe(plan: string) {
+    if (me.data?.unlimitedOwner) {
+      nav("/app/new");
+      return;
+    }
     setBusy(plan);
     try {
       const result = await post("/billing/checkout", { plan });
@@ -30,9 +39,7 @@ export default function Pricing() {
       <MarketingNav />
       <main className="section-shell pricing-page">
         <div className="section-intro">
-          <span className="eyebrow">
-            YOUR PLANS. A WORLD OF POSSIBILITY.
-          </span>
+          <span className="eyebrow">YOUR PLANS. A WORLD OF POSSIBILITY.</span>
           <h1>
             Start free.
             <br />
@@ -44,20 +51,26 @@ export default function Pricing() {
             Subscribe when you’re ready for somewhere new.
           </p>
         </div>
+        {me.data?.unlimitedOwner && (
+          <Notice>
+            Your approved admin account can create trips without a subscription.{" "}
+            <Link to="/app/new">Create a trip</Link>
+          </Notice>
+        )}
         <PriceCards />
         <div className="subscribe-controls">
           <Button
             loading={busy === "monthly"}
             onClick={() => subscribe("monthly")}
           >
-            Choose monthly · €5
+            {me.data?.unlimitedOwner ? "Create a trip" : "Choose monthly · €5"}
           </Button>
           <Button
             variant="secondary"
             loading={busy === "annual"}
             onClick={() => subscribe("annual")}
           >
-            Choose annual · €40
+            {me.data?.unlimitedOwner ? "Create a trip" : "Choose annual · €40"}
           </Button>
         </div>
         {config.data && !config.data.payments && (

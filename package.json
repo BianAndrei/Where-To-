@@ -17,6 +17,7 @@
     "db:migrate": "npm run db:migrate -w @whereto/api",
     "db:check": "tsx --env-file=.env scripts/check-database.ts",
     "admin:owner": "tsx --env-file=.env scripts/admin-owner.ts",
+    "test-admin:seed": "tsx --env-file=.env scripts/test-admin.ts",
     "brand:build": "tsx scripts/brand-assets.ts"
   },
   "overrides": {

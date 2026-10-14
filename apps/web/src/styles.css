@@ -2002,18 +2002,50 @@ small.muted {
 .destination-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
-  margin: 12px 0;
+  gap: 10px;
+  margin: 14px 0;
 }
 .destination-chips > span {
-  background: #f4e7cd;
-  border-radius: 8px;
-  padding: 7px 10px;
-  font-size: 11px;
-  font-weight: 700;
+  background: #fffefa;
+  border: 1px solid #e6dcc6;
+  border-left: 4px solid #d9a441;
+  border-radius: 12px;
+  padding: 9px 10px 9px 12px;
+  box-shadow: 0 4px 14px #43331d0f;
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.destination-chips > .kind-country {
+  border-left-color: #4f8f7a;
+}
+.destination-chips > .kind-region {
+  border-left-color: #6b86b8;
+}
+.destination-chips .chip-text strong {
+  display: block;
+  font-size: 13px;
+}
+.destination-chips .chip-text small {
+  display: block;
+  font-size: 10.5px;
+  color: #92846c;
+  margin-top: 2px;
+  font-weight: 500;
+}
+.place-flag {
+  line-height: 1;
+}
+.place-kind {
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8a6a2b;
+  background: #f4e7cd;
+  border-radius: 999px;
+  padding: 3px 8px;
 }
 .destination-chips button {
   padding: 0;

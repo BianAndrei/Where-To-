@@ -60,7 +60,8 @@ export default function Dashboard() {
     !!me.data?.entitlement?.freeTripReplacementUsedAt &&
     !!trips.data?.some((trip) => trip.isFree);
   async function permanentlyDeleteTrip() {
-    if (!deleteTarget || deleteConfirmation !== deleteTarget.state.title) return;
+    if (!deleteTarget || deleteConfirmation !== deleteTarget.state.title)
+      return;
     setDeleting(true);
     try {
       const result = await api<{
@@ -93,14 +94,19 @@ export default function Dashboard() {
           <Logo />
         </Link>
         <div>
-          <Link to="/pricing" className="plan-label">
-            {me.data?.pro
-              ? "Whereto Plus"
-              : me.data?.tripCredits
-                ? `${me.data.tripCredits} bonus trip credits`
-                : me.data?.entitlement?.freeTripClaimedAt
-                  ? "Free trip claimed"
-                  : "First trip free"}
+          <Link
+            to={me.data?.unlimitedOwner ? "/app/new" : "/pricing"}
+            className="plan-label"
+          >
+            {me.data?.unlimitedOwner
+              ? "Unlimited admin access"
+              : me.data?.pro
+                ? "Whereto Plus"
+                : me.data?.tripCredits
+                  ? `${me.data.tripCredits} bonus trip credits`
+                  : me.data?.entitlement?.freeTripClaimedAt
+                    ? "Free trip claimed"
+                    : "First trip free"}
           </Link>
           <Link
             className="icon-button"
@@ -170,11 +176,12 @@ export default function Dashboard() {
           <Link
             className="button button-primary"
             to={
-              me.data?.entitlement?.freeTripClaimedAt &&
-              !me.data.pro &&
-              !me.data.tripCredits
-                ? "/pricing"
-                : "/app/new"
+              me.data?.unlimitedOwner ||
+              !me.data?.entitlement?.freeTripClaimedAt ||
+              me.data.pro ||
+              me.data.tripCredits
+                ? "/app/new"
+                : "/pricing"
             }
           >
             <Plus size={19} /> Plan a trip
@@ -315,11 +322,12 @@ export default function Dashboard() {
                 transition={instant ? { duration: 0 } : softSpring}
                 className="new-trip-card"
                 to={
-                  me.data?.entitlement?.freeTripClaimedAt &&
-                  !me.data.pro &&
-                  !me.data.tripCredits
-                    ? "/pricing"
-                    : "/app/new"
+                  me.data?.unlimitedOwner ||
+                  !me.data?.entitlement?.freeTripClaimedAt ||
+                  me.data.pro ||
+                  me.data.tripCredits
+                    ? "/app/new"
+                    : "/pricing"
                 }
               >
                 <span className="new-trip-plus">
@@ -422,9 +430,7 @@ export default function Dashboard() {
               <input
                 autoComplete="off"
                 value={deleteConfirmation}
-                onChange={(event) =>
-                  setDeleteConfirmation(event.target.value)
-                }
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
               />
             </Field>
             <div className="modal-actions">

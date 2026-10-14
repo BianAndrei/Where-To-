@@ -35,6 +35,7 @@
     "sharp": "^0.35.4",
     "stripe": "^22.6.1",
     "tesseract.js": "^6.0.1",
+    "tz-lookup": "^6.1.25",
     "undici": "^7.16.0",
     "zod": "^3.25.76"
   },
@@ -42,6 +43,7 @@
     "@types/express": "^5.0.5",
     "@types/multer": "^2.0.0",
     "@types/pg": "^8.15.6",
+    "@types/tz-lookup": "^6.1.2",
     "prisma": "^6.12.0"
   }
 }

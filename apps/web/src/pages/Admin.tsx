@@ -56,6 +56,7 @@ const sections = [
   { path: "jobs", title: "Jobs", icon: Queue },
   { path: "integrations", title: "Integrations", icon: Plugs },
   { path: "activity", title: "Activity log", icon: ClockCounterClockwise },
+  { path: "login-events", title: "Login history", icon: LockKey },
 ];
 const date = (value: string | null) =>
   value
@@ -745,8 +746,8 @@ export default function Admin() {
             <>
               <h1>This workspace is private.</h1>
               <p>
-                Admin is available only to the verified owner account configured
-                on this server.
+                Admin is available only to verified administrator accounts
+                protected by an authenticator.
               </p>
               <Link className="button button-primary" to="/app">
                 Back to your trips
@@ -755,7 +756,9 @@ export default function Admin() {
           ) : access.error ? (
             <>
               <h1>Welcome to Whereto Admin.</h1>
-              <p>Sign in with your verified owner account to continue.</p>
+              <p>
+                Sign in with your verified administrator account to continue.
+              </p>
               <Link className="button button-primary" to="/login?next=%2Fadmin">
                 Sign in
               </Link>
@@ -866,7 +869,7 @@ export default function Admin() {
                       : "Operational data only. Private trip content stays private."}
                 </p>
               </div>
-              {["overview", "activity"].includes(page) && (
+              {["overview", "activity", "login-events"].includes(page) && (
                 <Field label="Period">
                   <Select
                     aria-label="Period"
@@ -909,17 +912,34 @@ export default function Admin() {
             ) : (
               data.data && (
                 <>
-                  {["users", "subscriptions", "jobs", "activity"].includes(
-                    page,
-                  ) && (
+                  {[
+                    "users",
+                    "subscriptions",
+                    "jobs",
+                    "activity",
+                    "login-events",
+                  ].includes(page) && (
                     <div className="admin-filters">
-                      <Field label={page === "activity" ? "Action" : "Status"}>
+                      <Field
+                        label={
+                          page === "activity"
+                            ? "Action"
+                            : page === "login-events"
+                              ? "Event"
+                              : "Status"
+                        }
+                      >
                         <Select
                           value={params.get("status") ?? ""}
                           onValueChange={(v) => filter("status", v)}
                         >
                           <SelectOption value="">
-                            All {page === "activity" ? "actions" : "statuses"}
+                            All{" "}
+                            {page === "activity"
+                              ? "actions"
+                              : page === "login-events"
+                                ? "events"
+                                : "statuses"}
                           </SelectOption>
                           {(page === "users"
                             ? ["suspended"]
@@ -941,18 +961,42 @@ export default function Admin() {
                                     "completed",
                                     "failed",
                                   ]
-                                : [
-                                    "grant",
-                                    "revoke-credit",
-                                    "suspend",
-                                    "reactivate",
-                                    "revoke-sessions",
-                                    "retry",
-                                    "integration",
-                                    "resync",
-                                    "resync-event",
-                                    "admin.verify",
-                                  ]
+                                : page === "login-events"
+                                  ? [
+                                      "login_success",
+                                      "login_failed",
+                                      "logout",
+                                      "session_expired",
+                                      "password_changed",
+                                    ]
+                                  : [
+                                      "grant",
+                                      "revoke-credit",
+                                      "suspend",
+                                      "reactivate",
+                                      "revoke-sessions",
+                                      "retry",
+                                      "integration",
+                                      "resync",
+                                      "resync-event",
+                                      "admin.verify",
+                                      "account.created",
+                                      "account.updated",
+                                      "security.password_changed",
+                                      "preferences.updated",
+                                      "trip.created",
+                                      "trip.item.save",
+                                      "trip.item.delete",
+                                      "trip.archived",
+                                      "trip.unarchived",
+                                      "trip.deleted",
+                                      "trip.share_created",
+                                      "trip.share_revoked",
+                                      "trip.collaborator_joined",
+                                      "trip.collaborator_removed",
+                                      "document.created",
+                                      "document.deleted",
+                                    ]
                           ).map((s) => (
                             <SelectOption key={s} value={s}>
                               {s.replaceAll("-", " ")}
@@ -971,6 +1015,45 @@ export default function Admin() {
                             <SelectOption value="year">Annual</SelectOption>
                           </Select>
                         </Field>
+                      )}
+                      {page === "users" && (
+                        <Field label="Role">
+                          <Select
+                            value={params.get("role") ?? ""}
+                            onValueChange={(v) => filter("role", v)}
+                          >
+                            <SelectOption value="">All roles</SelectOption>
+                            <SelectOption value="admin">
+                              Administrator
+                            </SelectOption>
+                            <SelectOption value="client">Client</SelectOption>
+                          </Select>
+                        </Field>
+                      )}
+                      {["activity", "login-events"].includes(page) && (
+                        <>
+                          <Field label="User ID">
+                            <input
+                              value={params.get("user") ?? ""}
+                              onChange={(e) => filter("user", e.target.value)}
+                              placeholder="Filter by user ID"
+                            />
+                          </Field>
+                          <Field label="From (UTC)">
+                            <input
+                              type="date"
+                              value={params.get("from") ?? ""}
+                              onChange={(e) => filter("from", e.target.value)}
+                            />
+                          </Field>
+                          <Field label="To (UTC)">
+                            <input
+                              type="date"
+                              value={params.get("to") ?? ""}
+                              onChange={(e) => filter("to", e.target.value)}
+                            />
+                          </Field>
+                        </>
                       )}
                       {(params.get("q") || params.get("user")) && (
                         <Button
@@ -991,6 +1074,7 @@ export default function Admin() {
                     <AdminTable
                       columns={[
                         "Account",
+                        "Role",
                         "Access",
                         "Trips",
                         "Menu allowance",
@@ -1008,6 +1092,11 @@ export default function Admin() {
                             </button>
                             <Id value={u.id} />
                             <small>Joined {date(u.createdAt)}</small>
+                          </td>
+                          <td>
+                            <Tag tone={u.role === "admin" ? "blue" : "neutral"}>
+                              {u.role === "admin" ? "Administrator" : "Client"}
+                            </Tag>
                           </td>
                           <td>
                             <Tag
@@ -1043,11 +1132,13 @@ export default function Admin() {
                             <small>{u.tripCredits} bonus trip credits</small>
                           </td>
                           <td>
-                            {u.menuAllowance.normalRemaining} normal +{" "}
-                            {u.menuAllowance.bonus} bonus
+                            {u.menuAllowance.unlimited
+                              ? "Unlimited"
+                              : `${u.menuAllowance.normalRemaining} normal + ${u.menuAllowance.bonus} bonus`}
                             <small>
-                              {u.menuAllowance.used} / {u.menuAllowance.limit}{" "}
-                              normal used
+                              {u.menuAllowance.unlimited
+                                ? `${u.menuAllowance.used} imports used`
+                                : `${u.menuAllowance.used} / ${u.menuAllowance.limit} normal used`}
                             </small>
                           </td>
                           <td>
@@ -1392,8 +1483,8 @@ export default function Admin() {
                   {page === "activity" && (
                     <>
                       <p className="admin-caption">
-                        Permanent operational history. Entries cannot be edited
-                        or deleted here.
+                        Administrator actions and client account changes.
+                        Entries cannot be edited or deleted here.
                       </p>
                       <AdminTable
                         columns={[
@@ -1408,6 +1499,7 @@ export default function Admin() {
                             <td>
                               {date(a.createdAt)}
                               <Id value={a.actorId} />
+                              <Tag>{a.source}</Tag>
                             </td>
                             <td>
                               <strong>{a.action.replaceAll("-", " ")}</strong>
@@ -1425,6 +1517,64 @@ export default function Admin() {
                               <pre className="admin-change">
                                 {JSON.stringify(a.change, null, 2)}
                               </pre>
+                            </td>
+                          </>
+                        )}
+                      />
+                    </>
+                  )}
+                  {page === "login-events" && (
+                    <>
+                      <p className="admin-caption">
+                        Successful and failed sign-ins, sign-outs and expired
+                        sessions. Timestamps are stored in UTC and shown in your
+                        local timezone.
+                      </p>
+                      <AdminTable
+                        columns={[
+                          "When",
+                          "Event",
+                          "Account",
+                          "Request context",
+                        ]}
+                        rows={rows}
+                        render={(event) => (
+                          <>
+                            <td>{date(event.createdAt)}</td>
+                            <td>
+                              <Tag
+                                tone={
+                                  event.event === "login_failed"
+                                    ? "warning"
+                                    : "neutral"
+                                }
+                              >
+                                {event.event.replaceAll("_", " ")}
+                              </Tag>
+                            </td>
+                            <td>
+                              {event.userId ? (
+                                <>
+                                  <button
+                                    className="admin-text-button"
+                                    onClick={() => setUserId(event.userId)}
+                                  >
+                                    View account
+                                  </button>
+                                  <Id value={event.userId} />
+                                </>
+                              ) : (
+                                "Unknown account"
+                              )}
+                            </td>
+                            <td>
+                              <small>
+                                {event.ipAddress ?? "IP unavailable"}
+                              </small>
+                              <small>
+                                {event.userAgent ??
+                                  "Browser details unavailable"}
+                              </small>
                             </td>
                           </>
                         )}
@@ -1500,6 +1650,7 @@ export default function Admin() {
               <h3>{user.data.email}</h3>
               <Id value={user.data.id} />
               <p>
+                {user.data.role === "admin" ? "Administrator" : "Client"} ·{" "}
                 {user.data.verified ? "Email verified" : "Email unverified"} ·{" "}
                 {user.data.freeTripClaimedAt
                   ? "Lifetime free trip already claimed"
@@ -1599,6 +1750,35 @@ export default function Admin() {
                 ))
               ) : (
                 <p>No interventions recorded.</p>
+              )}
+              <h3>Recent account activity</h3>
+              {user.data.activity.length ? (
+                user.data.activity.map((event: Row) => (
+                  <p key={event.id}>
+                    <strong>{event.action.replaceAll(".", " ")}</strong> ·{" "}
+                    {date(event.createdAt)}
+                    <small>
+                      {event.targetType} · {event.targetId}
+                    </small>
+                  </p>
+                ))
+              ) : (
+                <p>No account activity recorded.</p>
+              )}
+              <h3>Recent login history</h3>
+              {user.data.loginEvents.length ? (
+                user.data.loginEvents.map((event: Row) => (
+                  <p key={event.id}>
+                    <strong>{event.event.replaceAll("_", " ")}</strong> ·{" "}
+                    {date(event.createdAt)}
+                    <small>
+                      {event.ipAddress ?? "IP unavailable"} ·{" "}
+                      {event.userAgent ?? "Browser details unavailable"}
+                    </small>
+                  </p>
+                ))
+              ) : (
+                <p>No login history recorded.</p>
               )}
               <Link
                 className="admin-text-button"

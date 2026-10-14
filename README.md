@@ -159,6 +159,7 @@ Un total din confirmare nu este tratat ca plată. Un bon actualizează masa exis
 - Stripe Checkout și Customer Portal, verificarea prețului configurat și webhook semnat, cu deduplicarea evenimentelor.
 - Sincronizarea abonamentelor, anulării și perioadei plătite; retry/resync administrativ pentru erori.
 - Dashboard privat `/admin`: Overview, Users, Trips, Subscriptions, Jobs, Integrations și Activity log.
+- Roluri persistente `admin`/`client`, cu autorizare server-side și istoric paginat pentru autentificări și activitate.
 - Proprietar administrativ identificat prin `ADMIN_OWNER_USER_ID`, cu TOTP și verificare suplimentară legată de sesiune.
 - Pentru citire, verificarea admin este valabilă maximum 8 ore; schimbările cer o verificare mai recentă de 10 minute.
 - Suspendare/reactivare utilizatori, revocarea sesiunilor și blocarea accesului la călătoriile unui proprietar suspendat.
@@ -393,12 +394,13 @@ npm run dev
 | `npm run dev`                                | Frontend + API + worker în dezvoltare                    |
 | `npm run build`                              | Build shared, API și frontend                            |
 | `npm run typecheck`                          | Verificare TypeScript în toate workspace-urile           |
-| `npm test`                                   | Toate testele Vitest; unele necesită DB/API              |
+| `npm test`                                   | Toate testele Vitest; necesită `TEST_DATABASE_URL` izolată |
 | `npm run test:e2e`                           | Playwright; aplicația trebuie pornită separat            |
 | `npm run db:generate`                        | Generare client Prisma                                   |
 | `npm run db:migrate`                         | Aplicarea migrărilor existente                           |
 | `npm run db:check`                           | Verificarea conexiunii PostgreSQL                        |
 | `npm run admin:owner -- owner@example.com`   | Configurarea unui cont verificat existent ca owner admin |
+| `npm run test-admin:seed`                    | Crearea idempotentă a administratorului de test (`admin@test.com`) |
 | `npm run brand:build`                        | Generarea activelor de brand                             |
 | `npm run build:presentation -w @whereto/web` | Build static de prezentare                               |
 
@@ -410,7 +412,8 @@ Pentru un owner nou, exclusiv local, există `npm run admin:owner -- owner@examp
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Bază          | `NODE_ENV`, `PORT`, `APP_URL`, `DATABASE_URL`, `BETTER_AUTH_SECRET`, `DATA_DIR`                                                                      | API, autentificare, DB și stocare locală                                          |
 | Site public   | `VITE_PUBLIC_SITE_URL`                                                                                                                               | Canonical, sitemap și URL-uri absolute pentru previzualizări; se citește la build |
-| Owner admin   | `ADMIN_OWNER_USER_ID`                                                                                                                                | Identitatea administrativă autorizată de server                                   |
+| Administrare | `ADMIN_OWNER_USER_ID`; rolul PostgreSQL `user.role`                                                                                                  | Autorizare server-side; TOTP și dovada legată de sesiune rămân obligatorii         |
+| Teste auth    | `TEST_DATABASE_URL`, `TEST_ADMIN_PASSWORD`                                                                                                           | Bază/schemă izolată cu nume `test`; parola nu este stocată în cod                  |
 | Geoapify      | `GEOAPIFY_API_KEY`, `GEOAPIFY_DAILY_CREDITS`                                                                                                         | Căutare locuri, hartă, rute și exporturi                                          |
 | Groq          | `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_DAILY_TOKENS`                                                                                                    | Extragere/traducere meniuri; modelul implicit din cod este `openai/gpt-oss-120b`  |
 | Google Places | `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_MONTHLY_REQUESTS`                                                                                              | Componenta oficială de descoperire                                                |
@@ -478,7 +481,7 @@ npm test -- tests/domain.test.ts tests/rounding.test.ts tests/today.test.ts test
 | `billing`, `menus`, `export`  | Webhookuri și deduplicare, procesarea meniurilor/retry, PDF/PNG cu hartă de test etichetată                        |
 | `browser/*.spec.ts`           | Planner, navigare, experiență cont/onboarding, motion, interacțiuni și tranziții pe desktop/mobil                  |
 
-Pentru toate testele: configurează DB de dezvoltare/test, aplică migrările și pornește `npm run dev` la `localhost:5173`. Testele HTTP de acceptanță cer cutia poștală locală, fără Resend, și folosesc conturi temporare `@example.test`. Playwright nu pornește automat aplicația; browserele sale trebuie instalate (`npx playwright install chromium webkit`).
+Pentru toate testele care folosesc PostgreSQL, configurează `TEST_DATABASE_URL` către o bază/schemă izolată al cărei nume include `test`; Vitest refusează pornirea fără această protecție și redirecționează Prisma la acel URL. Aplică migrările numai către ținta de test. `admin@test.com` se creează doar explicit, când `NODE_ENV=test` și `TEST_ADMIN_PASSWORD` au fost setate; se folosește un hash Better Auth și parola unui cont existent nu este resetată. Procedura detaliată este în [docs/admin.md](docs/admin.md). Testele HTTP de acceptanță cer cutia poștală locală, fără Resend, și folosesc conturi temporare `@example.test`. Playwright nu pornește automat aplicația; browserele sale trebuie instalate (`npx playwright install chromium webkit`).
 
 ```powershell
 npm test

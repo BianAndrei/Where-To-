@@ -74,7 +74,9 @@ async function createPerson(): Promise<Person> {
   p.cookie = cookies(login);
   return p;
 }
-const body = (extra: Record<string, unknown> = {}) => ({
+const body = (
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> => ({
   requestKey: randomUUID(),
   reason: "Local acceptance test intervention",
   ...extra,
@@ -104,12 +106,16 @@ beforeAll(async () => {
   db = (await import("../apps/api/src/db")).db;
   initialControls.push(...(await db.integrationControl.findMany()));
   await new Promise<void>((resolve) => {
-    server = mod.app.listen(0, "127.0.0.1", resolve);
+    server = mod.app.listen(0, "127.0.0.1", () => resolve());
   });
   base = `http://127.0.0.1:${(server.address() as any).port}`;
   admin = await createPerson();
   owner = await createPerson();
   viewer = await createPerson();
+  await db.user.update({
+    where: { id: admin.id },
+    data: { role: "admin" },
+  });
   process.env.ADMIN_OWNER_USER_ID = admin.id;
 }, 30000);
 
@@ -117,6 +123,10 @@ afterAll(async () => {
   if (server)
     await new Promise<void>((resolve) => server.close(() => resolve()));
   if (db) {
+    await db.auditLog.deleteMany({
+      where: { OR: [{ actorId: { in: ids } }, { targetId: { in: ids } }] },
+    });
+    await db.loginEvent.deleteMany({ where: { userId: { in: ids } } });
     await db.adminAudit.deleteMany({ where: { actorId: { in: ids } } });
     await db.trip.deleteMany({ where: { ownerId: { in: ids } } });
     await db.user.deleteMany({ where: { id: { in: ids } } });
@@ -150,6 +160,7 @@ describe.sequential(
         "jobs",
         "integrations",
         "activity",
+        "login-events",
       ]) {
         expect((await request(`/admin/${path}`)).status).toBe(401);
         expect((await request(`/admin/${path}`, owner)).status).toBe(403);
@@ -187,6 +198,16 @@ describe.sequential(
       expect(
         (await request("/admin/access", admin)).headers.get("cache-control"),
       ).toBe("no-store");
+    });
+    it("authorizes from the persisted admin role, not only the configured owner ID", async () => {
+      const ownerId = process.env.ADMIN_OWNER_USER_ID;
+      delete process.env.ADMIN_OWNER_USER_ID;
+      try {
+        expect((await request("/admin/overview", admin)).status).toBe(200);
+        expect((await request("/admin/overview", owner)).status).toBe(403);
+      } finally {
+        if (ownerId) process.env.ADMIN_OWNER_USER_ID = ownerId;
+      }
     });
     it("does not grant admin proof to a second session (including an OAuth-style session)", async () => {
       const { auth } = await import("../apps/api/src/auth");
@@ -240,6 +261,48 @@ describe.sequential(
           })
         ).status,
       ).toBe(200);
+    });
+    it("allows unlimited trips only for the verified configured owner", async () => {
+      const ownerTrip = await request("/trips", admin, state());
+      expect(ownerTrip.status).toBe(201);
+      expect((await ownerTrip.json()).funding).toBe("admin");
+      const nextOwnerTrip = await request("/trips", admin, state());
+      expect(nextOwnerTrip.status).toBe(201);
+      expect((await nextOwnerTrip.json()).funding).toBe("admin");
+      expect(await (await request("/me", admin)).json()).toMatchObject({
+        unlimitedOwner: true,
+      });
+      expect(
+        (
+          await db.entitlement.findUniqueOrThrow({
+            where: { userId: admin.id },
+          })
+        ).freeTripClaimedAt,
+      ).toBeNull();
+      expect(
+        await db.creditUse.count({ where: { grant: { userId: admin.id } } }),
+      ).toBe(0);
+
+      const secondAdmin = await createPerson();
+      await db.user.update({
+        where: { id: secondAdmin.id },
+        data: { role: "admin" },
+      });
+      expect((await request("/trips", secondAdmin, state())).status).toBe(201);
+      expect((await request("/trips", secondAdmin, state())).status).toBe(402);
+
+      try {
+        await db.user.update({
+          where: { id: admin.id },
+          data: { emailVerified: false },
+        });
+        expect((await request("/trips", admin, state())).status).toBe(403);
+      } finally {
+        await db.user.update({
+          where: { id: admin.id },
+          data: { emailVerified: true },
+        });
+      }
     });
     it("serializes repeated grants and concurrent trip-credit spending without resetting the free claim", async () => {
       const grantBody = body({ kind: "trip", quantity: 1 });
@@ -503,6 +566,16 @@ describe.sequential(
         await request(`/admin/activity?user=${owner.id}`, admin)
       ).json();
       expect(audit.total).toBeGreaterThan(3);
+      const loginEvents = await (
+        await request(`/admin/login-events?user=${owner.id}`, admin)
+      ).json();
+      expect(
+        loginEvents.rows.some(
+          (event: any) =>
+            event.userId === owner.id && event.event === "login_success",
+        ),
+      ).toBe(true);
+      expect(loginEvents.rows[0]).not.toHaveProperty("token");
       const id = audit.rows[0].id;
       expect(
         (await request(`/admin/activity/${id}`, admin, undefined, "DELETE"))

@@ -18,6 +18,18 @@ export async function sessionUser(req: Request) {
   await assertAccountActive(session.user.id);
   return session.user;
 }
+export async function isUnlimitedOwner(userId: string, tx: Tx = db) {
+  if (
+    !process.env.ADMIN_OWNER_USER_ID ||
+    userId !== process.env.ADMIN_OWNER_USER_ID
+  )
+    return false;
+  const user = await tx.user.findUnique({
+    where: { id: userId },
+    select: { emailVerified: true },
+  });
+  return user?.emailVerified === true;
+}
 export async function tripAccess(tripId: string, userId: string, edit = false) {
   const trip = await db.trip.findUnique({
     where: { id: tripId },
@@ -90,22 +102,30 @@ export async function menuAllowance(
   isFree: boolean,
   tx: Tx = db,
 ) {
+  const unlimited = await isUnlimitedOwner(ownerId, tx);
   const entitlement = await tx.entitlement.findUnique({
     where: { userId: ownerId },
   });
   const pro = hasPro(entitlement);
-  const bucket = pro ? quotaBucket(entitlement) : "free";
+  const bucket = unlimited
+    ? "admin-unlimited"
+    : pro
+      ? quotaBucket(entitlement)
+      : "free";
   const max = pro ? 30 : isFree ? 10 : 0;
-  const used = await tx.menu.count({ where: { ownerId, quotaBucket: bucket } });
+  const used = await tx.menu.count({
+    where: { ownerId, ...(unlimited ? {} : { quotaBucket: bucket }) },
+  });
   const bonus = await creditBalance(tx, ownerId, "menu");
   const normalRemaining = Math.max(0, max - used);
   return {
     bucket,
-    limit: max,
+    limit: unlimited ? null : max,
     used,
     bonus,
-    normalRemaining,
-    remaining: normalRemaining + bonus,
+    normalRemaining: unlimited ? null : normalRemaining,
+    remaining: unlimited ? null : normalRemaining + bonus,
+    unlimited,
     pro,
   };
 }

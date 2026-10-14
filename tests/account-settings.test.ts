@@ -8,6 +8,7 @@ import { defaultPreferences } from "@whereto/shared";
 
 let server: Server, base: string, db: typeof import("../apps/api/src/db").db;
 const ids = [randomUUID(), randomUUID()];
+const loginRequestIds: string[] = [];
 const initialNoListen = process.env.WHERETO_NO_LISTEN;
 const password = "Settings-fixture-" + randomUUID();
 let cookie = "",
@@ -77,6 +78,17 @@ beforeAll(async () => {
   otherCookie = cookies(other);
 });
 afterAll(async () => {
+  await db?.auditLog.deleteMany({
+    where: { OR: [{ actorId: { in: ids } }, { targetId: { in: ids } }] },
+  });
+  await db?.loginEvent.deleteMany({
+    where: {
+      OR: [
+        { userId: { in: ids } },
+        { requestId: { in: loginRequestIds } },
+      ],
+    },
+  });
   await db?.user.deleteMany({ where: { id: { in: ids } } });
   await new Promise<void>((resolve) => server?.close(() => resolve()));
   if (initialNoListen === undefined) delete process.env.WHERETO_NO_LISTEN;
@@ -132,6 +144,14 @@ it("saves only the signed-in user's validated preferences and rejects cross-orig
     preferences,
   );
   expect(
+    await db.auditLog.findFirst({
+      where: {
+        actorId: ids[0],
+        action: "preferences.updated",
+      },
+    }),
+  ).not.toBeNull();
+  expect(
     (await (await request("/api/v1/me", undefined, otherCookie)).json())
       .preferences,
   ).toEqual(defaultPreferences);
@@ -164,6 +184,11 @@ it("updates a profile and password using the real authentication service, revoki
   });
   expect(change.status).toBe(200);
   if (cookies(change)) cookie = cookies(change);
+  expect(
+    await db.loginEvent.findFirst({
+      where: { userId: ids[0], event: "password_changed" },
+    }),
+  ).not.toBeNull();
   expect((await request("/api/v1/me", undefined, secondCookie)).status).toBe(
     401,
   );
@@ -200,4 +225,73 @@ it("enables and verifies an authenticator, then disables it with the current pas
     (await db.user.findUniqueOrThrow({ where: { id: ids[0] } }))
       .twoFactorEnabled,
   ).toBe(false);
+});
+
+async function freshCookie() {
+  let login: Response;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    login = await request(
+      "/api/auth/sign-in/email",
+      { email: `${ids[0]}@example.test`, password: password + "new" },
+      "",
+    );
+    if (login.status !== 429) break;
+    await new Promise((resolve) => setTimeout(resolve, 11_000));
+  }
+  expect(login!.status).toBe(200);
+  return cookies(login!);
+}
+it("does not allow client data to grant admin access or a role change", async () => {
+  const session = await freshCookie();
+  await request("/api/auth/update-user", { role: "admin" }, session);
+  expect(
+    (await db.user.findUniqueOrThrow({ where: { id: ids[0] } })).role,
+  ).toBe("client");
+  expect((await request("/api/v1/admin/overview", undefined, session)).status).toBe(403);
+});
+
+it("records failed sign-in requests and successful sign-outs without credentials", async () => {
+  const requestId = randomUUID();
+  loginRequestIds.push(requestId);
+  const failed = await fetch(`${base}/api/auth/sign-in/email`, {
+    method: "POST",
+    headers: {
+      Origin: origin,
+      "Content-Type": "application/json",
+      "X-Request-ID": requestId,
+    },
+    body: JSON.stringify({
+      email: `${ids[0]}@example.test`,
+      password: "incorrect-password",
+    }),
+  });
+  expect(failed.status).toBeGreaterThanOrEqual(400);
+  let failureEvent;
+  for (let attempt = 0; attempt < 20 && !failureEvent; attempt++) {
+    failureEvent = await db.loginEvent.findFirst({
+      where: { requestId },
+    });
+    if (!failureEvent) await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  expect(failureEvent).toMatchObject({
+    event: "login_failed",
+    userId: null,
+    requestId,
+  });
+
+  const signOut = await request(
+    "/api/auth/sign-out",
+    {},
+    await freshCookie(),
+    "POST",
+  );
+  expect(signOut.status).toBe(200);
+  let logout;
+  for (let attempt = 0; attempt < 20 && !logout; attempt++) {
+    logout = await db.loginEvent.findFirst({
+      where: { userId: ids[0], event: "logout" },
+    });
+    if (!logout) await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  expect(logout).not.toBeNull();
 });

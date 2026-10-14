@@ -1,7 +1,8 @@
 import express from "express";
+import { randomUUID } from "node:crypto";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
-import { toNodeHandler } from "better-auth/node";
+import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import { ZodError } from "zod";
 import { auth } from "./auth.js";
 import { config } from "./config.js";
@@ -9,7 +10,11 @@ import { api } from "./api.js";
 import { stripeWebhook } from "./billing.js";
 import { HttpError, db } from "./db.js";
 import { admin } from "./admin.js";
-import { ownerSession, requireAdmin } from "./admin-access.js";
+import {
+  isAdminIdentity,
+  ownerSession,
+  requireAdmin,
+} from "./admin-access.js";
 export const app = express();
 app.disable("x-powered-by");
 app.use(
@@ -23,7 +28,52 @@ app.post(
   express.raw({ type: "application/json", limit: "1mb" }),
   stripeWebhook,
 );
-// An owner authenticator cannot be removed using only a password or OAuth session.
+const authRequestMetadata = (req: express.Request) => {
+  const suppliedId = req.get("x-request-id");
+  return {
+    ipAddress: req.ip?.slice(0, 64) ?? null,
+    userAgent: req.get("user-agent")?.slice(0, 512) ?? null,
+    requestId:
+      suppliedId && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(suppliedId)
+        ? suppliedId
+        : randomUUID(),
+  };
+};
+app.use("/api/auth/sign-in/email", (req, res, next) => {
+  if (req.method === "POST")
+    res.once("finish", () => {
+      if (res.statusCode < 400) return;
+      void db.loginEvent
+        .create({
+          data: {
+            event: "login_failed",
+            ...authRequestMetadata(req),
+          },
+        })
+        .catch(() => console.error("Failed to persist a failed login event."));
+    });
+  next();
+});
+app.use("/api/auth/sign-out", async (req, res, next) => {
+  const session = await auth.api.getSession({
+    headers: fromNodeHeaders(req.headers),
+  });
+  if (req.method === "POST" && session)
+    res.once("finish", () => {
+      if (res.statusCode >= 400) return;
+      void db.loginEvent
+        .create({
+          data: {
+            userId: session.user.id,
+            event: "logout",
+            ...authRequestMetadata(req),
+          },
+        })
+        .catch(() => console.error("Failed to persist a logout event."));
+    });
+  next();
+});
+// An administrator authenticator cannot be removed using only a password or OAuth session.
 app.use(
   [
     "/api/auth/two-factor/disable",
@@ -38,7 +88,7 @@ app.use(
         ) as [string, string][],
       ),
     });
-    if (s?.user.id === process.env.ADMIN_OWNER_USER_ID)
+    if (s && (await isAdminIdentity(s.user.id)))
       await requireAdmin(req, res, next);
     else next();
   },

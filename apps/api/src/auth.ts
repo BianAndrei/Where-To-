@@ -4,7 +4,11 @@ import { db, HttpError } from "./db.js";
 import { config } from "./config.js";
 import { twoFactor } from "better-auth/plugins";
 import { APIError } from "better-auth/api";
-import { milestone, assertAccountActive } from "./admin-domain.js";
+import {
+  milestone,
+  assertAccountActive,
+  recordAudit,
+} from "./admin-domain.js";
 import { reserveProvider } from "./providers.js";
 import { recordHealth } from "./integrations.js";
 async function sendMail(to: string, subject: string, url: string) {
@@ -54,6 +58,50 @@ export const auth = betterAuth({
           await milestone(db, user.id, "account_created");
           if (user.emailVerified)
             await milestone(db, user.id, "email_verified");
+          await recordAudit(
+            db,
+            user.id,
+            "user",
+            user.id,
+            "account.created",
+            undefined,
+            { role: "client" },
+          );
+        },
+      },
+      update: {
+        after: async (user) => {
+          await recordAudit(
+            db,
+            user.id,
+            "user",
+            user.id,
+            "account.updated",
+            undefined,
+            { updated: true },
+          );
+        },
+      },
+    },
+    account: {
+      update: {
+        after: async (account) => {
+          if (account.providerId !== "credential") return;
+          await db.loginEvent.create({
+            data: {
+              userId: account.userId,
+              event: "password_changed",
+            },
+          });
+          await recordAudit(
+            db,
+            account.userId,
+            "user",
+            account.userId,
+            "security.password_changed",
+            undefined,
+            { changed: true },
+          );
         },
       },
     },
@@ -71,6 +119,29 @@ export const auth = betterAuth({
             });
           return { data: session };
         },
+        after: async (session) => {
+          await db.loginEvent.create({
+            data: {
+              userId: session.userId,
+              event: "login_success",
+              ipAddress: session.ipAddress?.slice(0, 64),
+              userAgent: session.userAgent?.slice(0, 512),
+            },
+          });
+        },
+      },
+      delete: {
+        after: async (session) => {
+          if (session.expiresAt <= new Date())
+            await db.loginEvent.create({
+              data: {
+                userId: session.userId,
+                event: "session_expired",
+                ipAddress: session.ipAddress?.slice(0, 64),
+                userAgent: session.userAgent?.slice(0, 512),
+              },
+            });
+        },
       },
     },
   },
@@ -80,6 +151,13 @@ export const auth = betterAuth({
   secret: config.BETTER_AUTH_SECRET,
   trustedOrigins: [config.APP_URL],
   user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        defaultValue: "client",
+        input: false,
+      },
+    },
     changeEmail: {
       enabled: true,
       sendChangeEmailConfirmation: async ({ user, url }) =>

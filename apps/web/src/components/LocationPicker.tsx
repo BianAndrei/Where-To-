@@ -1,11 +1,43 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, MagnifyingGlass, Check } from "@phosphor-icons/react";
+import { MapPin, MagnifyingGlass, Check, Globe, MapTrifold, Buildings } from "@phosphor-icons/react";
 import type { Place } from "@whereto/shared";
 import { api } from "../lib/api";
 import { demoPlaces } from "../lib/demo";
 import { AnimatePresence, motion } from "motion/react";
 import { softSpring, useInstantMotion } from "./motion";
+const kindLabels = {
+  country: "Country",
+  region: "State / region",
+  city: "City",
+  place: "Attraction",
+} as const;
+export const placeKindLabel = (place: Place) => kindLabels[place.kind ?? "city"];
+export const placeSubtitle = (place: Place) =>
+  [place.kind === "country" ? undefined : place.region, place.country]
+    .filter((part, index, all) => part && all.indexOf(part) === index)
+    .join(", ");
+export const placeFlag = (place: Place) =>
+  place.countryCode
+    ? String.fromCodePoint(
+        ...place.countryCode
+          .toUpperCase()
+          .split("")
+          .map((c) => 127397 + c.charCodeAt(0)),
+      )
+    : undefined;
+export function PlaceIcon({ place, size = 20 }: { place: Place; size?: number }) {
+  const flag = placeFlag(place);
+  if (flag)
+    return (
+      <span className="place-flag" style={{ fontSize: size }} aria-hidden="true">
+        {flag}
+      </span>
+    );
+  const Icon =
+    place.kind === "country" ? Globe : place.kind === "region" ? MapTrifold : place.kind === "place" ? MapPin : Buildings;
+  return <Icon size={size} aria-hidden="true" />;
+}
 export function LocationPicker({
   onSelect,
   cities = false,
@@ -92,11 +124,12 @@ export function LocationPicker({
                   setOpen(false);
                 }}
               >
-                <MapPin size={20} />
+                <PlaceIcon place={place} />
                 <span>
                   <strong>{place.name}</strong>
-                  <small>{place.country}</small>
+                  <small>{placeSubtitle(place)}</small>
                 </span>
+                {cities && <em className="place-kind">{placeKindLabel(place)}</em>}
                 <Check size={16} />
               </button>
             ))}

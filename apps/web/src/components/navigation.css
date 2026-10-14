@@ -5,10 +5,16 @@
   gap: 6px;
 }
 .sidebar-header .brand-artwork.small .brand-graphic--mark {
-  width: 30px;
+  width: 38px;
 }
 .sidebar-header .brand-artwork.small .brand-graphic--name {
-  width: 73px;
+  width: 92px;
+}
+.planner:not(.nav-compact) .planner-sidebar {
+  width: 236px;
+}
+.planner:not(.nav-compact) .planner-body {
+  margin-left: 236px;
 }
 .sidebar-header .brand.brand-artwork {
   gap: 5px;

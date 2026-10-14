@@ -4,6 +4,7 @@ import {
   creditBalance,
   consumeCredit,
   milestone,
+  recordAudit,
 } from "./admin-domain.js";
 import { checkIntegration } from "./integrations.js";
 import multer from "multer";
@@ -26,7 +27,13 @@ import {
 } from "@whereto/shared";
 import { db, assert } from "./db.js";
 import { config, featureConfig } from "./config.js";
-import { sessionUser, tripAccess, hasPro, menuAllowance } from "./access.js";
+import {
+  sessionUser,
+  tripAccess,
+  hasPro,
+  isUnlimitedOwner,
+  menuAllowance,
+} from "./access.js";
 import {
   searchPlaces,
   trustedPlace,
@@ -153,12 +160,34 @@ api.get("/me", async (req, res) => {
     entitlement,
     pro: hasPro(entitlement),
     tripCredits: await creditBalance(db, user.id, "trip"),
+    unlimitedOwner: await isUnlimitedOwner(user.id),
   });
 });
 api.patch("/me/preferences", async (req, res) => {
   const user = await sessionUser(req);
   const preferences = preferencesSchema.parse(req.body);
-  await db.user.update({ where: { id: user.id }, data: { preferences } });
+  await db.$transaction(async (tx) => {
+    const current = await tx.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { preferences: true },
+    });
+    const previousKeys =
+      current.preferences &&
+      typeof current.preferences === "object" &&
+      !Array.isArray(current.preferences)
+        ? Object.keys(current.preferences)
+        : [];
+    await tx.user.update({ where: { id: user.id }, data: { preferences } });
+    await recordAudit(
+      tx,
+      user.id,
+      "user",
+      user.id,
+      "preferences.updated",
+      { fields: previousKeys },
+      { fields: Object.keys(preferences) },
+    );
+  });
   res.json(preferences);
 });
 api.get("/trips", async (req, res) => {
@@ -206,9 +235,13 @@ api.post("/trips", async (req, res) => {
       create: { userId: user.id },
       update: {},
     });
-    const isFree = !e.freeTripClaimedAt;
+    const unlimitedOwner = await isUnlimitedOwner(user.id, tx);
+    const isFree = !unlimitedOwner && !e.freeTripClaimedAt;
     assert(
-      isFree || hasPro(e) || (await creditBalance(tx, user.id, "trip")) > 0,
+      unlimitedOwner ||
+        isFree ||
+        hasPro(e) ||
+        (await creditBalance(tx, user.id, "trip")) > 0,
       402,
       "Your first trip is already claimed. Subscribe to create another trip.",
       "SUBSCRIPTION_REQUIRED",
@@ -218,7 +251,13 @@ api.post("/trips", async (req, res) => {
         ownerId: user.id,
         state: json(state),
         isFree,
-        funding: isFree ? "free" : hasPro(e) ? "subscription" : "bonus",
+        funding: unlimitedOwner
+          ? "admin"
+          : isFree
+            ? "free"
+            : hasPro(e)
+              ? "subscription"
+              : "bonus",
       },
     });
     if (isFree)
@@ -226,9 +265,18 @@ api.post("/trips", async (req, res) => {
         where: { userId: user.id },
         data: { freeTripClaimedAt: new Date() },
       });
-    if (!isFree && !hasPro(e))
+    if (!unlimitedOwner && !isFree && !hasPro(e))
       await consumeCredit(tx, user.id, "trip", `trip:${trip.id}`);
     await milestone(tx, user.id, "first_trip");
+    await recordAudit(
+      tx,
+      user.id,
+      "trip",
+      trip.id,
+      "trip.created",
+      { exists: false },
+      { exists: true, version: trip.version, funding: trip.funding },
+    );
     return trip;
   });
   res.status(201).json({ ...result, role: "owner" });
@@ -281,6 +329,15 @@ api.post("/trips/:id/commands", async (req, res) => {
         action: command.type,
       },
     });
+    await recordAudit(
+      tx,
+      user.id,
+      "trip",
+      trip.id,
+      `trip.${command.type}`,
+      { version },
+      { version: version + 1 },
+    );
     if (state.items.some((i) => !i.deletedAt))
       await milestone(tx, trip.ownerId, "first_item");
     if (state.items.some((i) => !i.deletedAt && i.lines.length > 0))
@@ -294,12 +351,23 @@ api.post("/trips/:id/archive", async (req, res) => {
   const trip = await tripAccess(String(req.params.id), user.id, true);
   assert(trip.role === "owner", 403, "Only the owner can archive a trip.");
   const { archived } = z.object({ archived: z.boolean() }).parse(req.body);
-  res.json(
-    await db.trip.update({
+  const updated = await db.$transaction(async (tx) => {
+    const result = await tx.trip.update({
       where: { id: trip.id },
       data: { archivedAt: archived ? new Date() : null },
-    }),
-  );
+    });
+    await recordAudit(
+      tx,
+      user.id,
+      "trip",
+      trip.id,
+      archived ? "trip.archived" : "trip.unarchived",
+      { archived: !!trip.archivedAt },
+      { archived },
+    );
+    return result;
+  });
+  res.json(updated);
 });
 api.delete("/trips/:id", async (req, res) => {
   const user = await sessionUser(req);
@@ -367,6 +435,15 @@ api.delete("/trips/:id", async (req, res) => {
           freeTripReplacementUsedAt: new Date(),
         },
       });
+    await recordAudit(
+      tx,
+      user.id,
+      "trip",
+      current.id,
+      "trip.deleted",
+      { exists: true, version: current.version },
+      { exists: false },
+    );
     await tx.trip.delete({ where: { id: current.id } });
     return restoreReplacement;
   });
@@ -483,8 +560,27 @@ api.post("/trips/:id/shares", async (req, res) => {
     })
     .parse(req.body);
   const token = randomBytes(32).toString("base64url");
-  const link = await db.shareLink.create({
-    data: { tripId: trip.id, tokenHash: hash(token), ...body },
+  const link = await db.$transaction(async (tx) => {
+    const created = await tx.shareLink.create({
+      data: { tripId: trip.id, tokenHash: hash(token), ...body },
+    });
+    await recordAudit(
+      tx,
+      user.id,
+      "trip",
+      trip.id,
+      "trip.share_created",
+      {
+        activeLinks:
+          (await tx.shareLink.count({ where: { tripId: trip.id } })) - 1,
+      },
+      {
+        role: body.role,
+        showBudget: body.showBudget,
+        showAccommodation: body.showAccommodation,
+      },
+    );
+    return created;
   });
   res.json({
     id: link.id,
@@ -504,9 +600,21 @@ api.delete("/trips/:id/shares/:linkId", async (req, res) => {
   const user = await sessionUser(req);
   const trip = await tripAccess(String(req.params.id), user.id, true);
   assert(trip.role === "owner", 403, "Only the owner can manage sharing.");
-  await db.shareLink.updateMany({
-    where: { id: String(req.params.linkId), tripId: trip.id },
-    data: { revokedAt: new Date() },
+  await db.$transaction(async (tx) => {
+    const result = await tx.shareLink.updateMany({
+      where: { id: String(req.params.linkId), tripId: trip.id },
+      data: { revokedAt: new Date() },
+    });
+    if (result.count)
+      await recordAudit(
+        tx,
+        user.id,
+        "trip",
+        trip.id,
+        "trip.share_revoked",
+        { active: true },
+        { active: false },
+      );
   });
   res.json({ ok: true });
 });
@@ -549,10 +657,26 @@ api.post("/join/:token", async (req, res) => {
     select: { ownerId: true },
   });
   await assertAccountActive(owner.ownerId);
-  await db.tripMember.upsert({
-    where: { tripId_userId: { tripId: link.tripId, userId: user.id } },
-    create: { tripId: link.tripId, userId: user.id, role: "editor" },
-    update: {},
+  await db.$transaction(async (tx) => {
+    const existing = await tx.tripMember.findUnique({
+      where: { tripId_userId: { tripId: link.tripId, userId: user.id } },
+      select: { role: true },
+    });
+    await tx.tripMember.upsert({
+      where: { tripId_userId: { tripId: link.tripId, userId: user.id } },
+      create: { tripId: link.tripId, userId: user.id, role: "editor" },
+      update: {},
+    });
+    if (!existing)
+      await recordAudit(
+        tx,
+        user.id,
+        "trip",
+        link.tripId,
+        "trip.collaborator_joined",
+        { member: false },
+        { member: true, role: "editor" },
+      );
   });
   res.json({ tripId: link.tripId });
 });
@@ -587,8 +711,20 @@ api.delete("/trips/:id/members/:memberId", async (req, res) => {
     403,
     "Only the owner can manage collaborators.",
   );
-  await db.tripMember.deleteMany({
-    where: { tripId: trip.id, userId: String(req.params.memberId) },
+  await db.$transaction(async (tx) => {
+    const result = await tx.tripMember.deleteMany({
+      where: { tripId: trip.id, userId: String(req.params.memberId) },
+    });
+    if (result.count)
+      await recordAudit(
+        tx,
+        user.id,
+        "trip",
+        trip.id,
+        "trip.collaborator_removed",
+        { member: true },
+        { member: false },
+      );
   });
   res.json({ ok: true });
 });
@@ -616,15 +752,27 @@ api.post("/trips/:id/documents", upload.single("file"), async (req, res) => {
   );
   const key = `documents/${trip.id}/${randomBytes(16).toString("hex")}`;
   await putFile(key, file.buffer, mime);
-  const doc = await db.document.create({
-    data: {
-      tripId: trip.id,
-      itemId: req.body.itemId || null,
-      name: file.originalname.replace(/[\r\n]/g, "").slice(0, 180),
-      mime,
-      size: file.size,
-      storageKey: key,
-    },
+  const doc = await db.$transaction(async (tx) => {
+    const created = await tx.document.create({
+      data: {
+        tripId: trip.id,
+        itemId: req.body.itemId || null,
+        name: file.originalname.replace(/[\r\n]/g, "").slice(0, 180),
+        mime,
+        size: file.size,
+        storageKey: key,
+      },
+    });
+    await recordAudit(
+      tx,
+      user.id,
+      "document",
+      created.id,
+      "document.created",
+      { exists: false },
+      { exists: true, mime, size: file.size },
+    );
+    return created;
   });
   res.status(201).json({ ...doc, storageKey: undefined });
 });
@@ -650,7 +798,18 @@ api.delete("/documents/:id", async (req, res) => {
   });
   assert(doc, 404, "Document not found.");
   await tripAccess(doc.tripId, user.id, true);
-  await db.document.delete({ where: { id: doc.id } });
+  await db.$transaction(async (tx) => {
+    await tx.document.delete({ where: { id: doc.id } });
+    await recordAudit(
+      tx,
+      user.id,
+      "document",
+      doc.id,
+      "document.deleted",
+      { exists: true, mime: doc.mime, size: doc.size },
+      { exists: false },
+    );
+  });
   await deleteFile(doc.storageKey);
   res.json({ ok: true });
 });
@@ -699,7 +858,7 @@ api.post("/trips/:id/menus/import", upload.single("file"), async (req, res) => {
   await checkIntegration("groq-tokens");
   await checkIntegration("storage");
   assert(
-    allowance.remaining > 0,
+    allowance.unlimited || (allowance.remaining ?? 0) > 0,
     402,
     "Your menu import allowance is used up. You can still enter a meal estimate.",
     "MENU_QUOTA",
@@ -711,19 +870,31 @@ api.post("/trips/:id/menus/import", upload.single("file"), async (req, res) => {
     storageKey = `imports/${trip.id}/${randomBytes(16).toString("hex")}`;
     await putFile(storageKey, req.file.buffer, mime);
   }
-  const job = await db.job.create({
-    data: {
-      tripId: trip.id,
-      type: "menu",
-      input: json({
-        itemId,
-        source,
-        sourceHash,
-        storageKey,
-        bucket: allowance.bucket,
-        ownerId: trip.ownerId,
-      }),
-    },
+  const job = await db.$transaction(async (tx) => {
+    const created = await tx.job.create({
+      data: {
+        tripId: trip.id,
+        type: "menu",
+        input: json({
+          itemId,
+          source,
+          sourceHash,
+          storageKey,
+          bucket: allowance.bucket,
+          ownerId: trip.ownerId,
+        }),
+      },
+    });
+    await recordAudit(
+      tx,
+      user.id,
+      "trip",
+      trip.id,
+      "trip.menu_import_requested",
+      { activeJob: false },
+      { activeJob: true, jobId: created.id },
+    );
+    return created;
   });
   const queue = await getQueue();
   await queue.send(
@@ -756,8 +927,20 @@ api.post("/trips/:id/exports", async (req, res) => {
     400,
     "Choose a day within this trip.",
   );
-  const job = await db.job.create({
-    data: { tripId: trip.id, type: "export", input: json(options) },
+  const job = await db.$transaction(async (tx) => {
+    const created = await tx.job.create({
+      data: { tripId: trip.id, type: "export", input: json(options) },
+    });
+    await recordAudit(
+      tx,
+      user.id,
+      "trip",
+      trip.id,
+      "trip.export_requested",
+      { activeJob: false },
+      { activeJob: true, jobId: created.id, format: options.format },
+    );
+    return created;
   });
   await (
     await getQueue()

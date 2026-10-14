@@ -24,6 +24,58 @@ vi.mock("../apps/api/src/providers", () => ({
 vi.mock("../apps/api/src/queue", () => ({
   getQueue: async () => ({ send: mocks.send }),
 }));
+it("removes menu import caps only for the verified configured owner", async () => {
+  const { db } = await import("../apps/api/src/db");
+  const { menuAllowance } = await import("../apps/api/src/access");
+  const verifiedOwnerId = "menu-owner-" + randomUUID();
+  const otherId = "menu-other-" + randomUUID();
+  const previousOwnerId = process.env.ADMIN_OWNER_USER_ID;
+  await db.user.createMany({
+    data: [
+      {
+        id: verifiedOwnerId,
+        name: "Verified owner fixture",
+        email: verifiedOwnerId + "@example.test",
+        emailVerified: true,
+      },
+      {
+        id: otherId,
+        name: "Other user fixture",
+        email: otherId + "@example.test",
+        emailVerified: true,
+      },
+    ],
+  });
+  try {
+    process.env.ADMIN_OWNER_USER_ID = verifiedOwnerId;
+    expect(await menuAllowance(verifiedOwnerId, true)).toMatchObject({
+      unlimited: true,
+      limit: null,
+      remaining: null,
+      bucket: "admin-unlimited",
+    });
+    expect(await menuAllowance(otherId, true)).toMatchObject({
+      unlimited: false,
+      limit: 10,
+      remaining: 10,
+    });
+    await db.user.update({
+      where: { id: verifiedOwnerId },
+      data: { emailVerified: false },
+    });
+    expect(await menuAllowance(verifiedOwnerId, true)).toMatchObject({
+      unlimited: false,
+      limit: 10,
+      remaining: 10,
+    });
+  } finally {
+    if (previousOwnerId) process.env.ADMIN_OWNER_USER_ID = previousOwnerId;
+    else delete process.env.ADMIN_OWNER_USER_ID;
+    await db.user.deleteMany({
+      where: { id: { in: [verifiedOwnerId, otherId] } },
+    });
+  }
+});
 it("validates menu evidence, reuses imports, leaves missing prices unknown and retries Groq without charging failures", async () => {
   vi.stubEnv("GROQ_API_KEY", "fixture-key-not-live");
   const { db } = await import("../apps/api/src/db");

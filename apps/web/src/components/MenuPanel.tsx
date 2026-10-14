@@ -130,9 +130,11 @@ export default function MenuPanel({
     >
       <div className="menu-panel">
         <Notice>
-          Menu imports: {demo ? "10" : (menus.data?.allowance.remaining ?? "…")}{" "}
-          remaining{" "}
-          {menus.data?.allowance.pro ? "this month" : "for your first trip"}.
+          {demo
+            ? "Menu imports: 10 remaining for your first trip."
+            : menus.data?.allowance.unlimited
+              ? "Unlimited menu imports for your verified admin account."
+              : `Menu imports: ${menus.data?.allowance.remaining ?? "…"} remaining ${menus.data?.allowance.pro ? "this month" : "for your first trip"}.`}{" "}
           Failed imports don’t count.
         </Notice>
         {!menu ? (

@@ -126,6 +126,15 @@ const querySchema = z.object({
   status: z.string().max(40).default(""),
   plan: z.enum(["", "month", "year"]).default(""),
   user: z.string().max(160).default(""),
+  role: z.enum(["", "admin", "client"]).default(""),
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 const pageSize = 20;
 const pageResult = (rows: unknown[], total: number, page: number) => ({
@@ -134,9 +143,26 @@ const pageResult = (rows: unknown[], total: number, page: number) => ({
   page,
   pageSize,
 });
+function activityWindow(f: z.infer<typeof querySchema>) {
+  const to = f.to ? new Date(`${f.to}T23:59:59.999Z`) : new Date();
+  const from = f.from
+    ? new Date(`${f.from}T00:00:00.000Z`)
+    : new Date(to.getTime() - f.days * 86400000);
+  assert(
+    Number.isFinite(from.getTime()) &&
+      Number.isFinite(to.getTime()) &&
+      (!f.from || from.toISOString().slice(0, 10) === f.from) &&
+      (!f.to || to.toISOString().slice(0, 10) === f.to) &&
+      from <= to,
+    400,
+    "Choose a valid activity date range.",
+  );
+  return { from, to };
+}
 const userSelect = {
   id: true,
   email: true,
+  role: true,
   emailVerified: true,
   createdAt: true,
   suspendedAt: true,
@@ -198,17 +224,29 @@ const subscriptionDTO = (e: any) => ({
 
 admin.get("/users", async (req, res) => {
   const f = querySchema.parse(req.query);
-  const where: Prisma.UserWhereInput = {
-    ...(f.q
-      ? {
-          OR: [
-            { email: { contains: f.q, mode: "insensitive" } },
-            { id: { contains: f.q } },
-          ],
-        }
-      : {}),
-    ...(f.status === "suspended" ? { suspendedAt: { not: null } } : {}),
-  };
+  const filters: Prisma.UserWhereInput[] = [];
+  if (f.q)
+    filters.push({
+      OR: [
+        { email: { contains: f.q, mode: "insensitive" } },
+        { id: { contains: f.q } },
+      ],
+    });
+  if (f.status === "suspended") filters.push({ suspendedAt: { not: null } });
+  if (f.role === "admin" && process.env.ADMIN_OWNER_USER_ID)
+    filters.push({
+      OR: [
+        { role: "admin" },
+        { id: process.env.ADMIN_OWNER_USER_ID },
+      ],
+    });
+  else if (f.role === "client" && process.env.ADMIN_OWNER_USER_ID)
+    filters.push({
+      role: "client",
+      id: { not: process.env.ADMIN_OWNER_USER_ID },
+    });
+  else if (f.role) filters.push({ role: f.role });
+  const where: Prisma.UserWhereInput = filters.length ? { AND: filters } : {};
   const [users, total] = await Promise.all([
     db.user.findMany({
       where,
@@ -225,6 +263,8 @@ admin.get("/users", async (req, res) => {
         users.map(async (u) => ({
           id: u.id,
           email: u.email,
+          role:
+            u.id === process.env.ADMIN_OWNER_USER_ID ? "admin" : u.role,
           verified: u.emailVerified,
           createdAt: u.createdAt,
           suspendedAt: u.suspendedAt,
@@ -247,7 +287,7 @@ admin.get("/users/:id", async (req, res) => {
   const id = String(req.params.id);
   const u = await db.user.findUnique({ where: { id }, select: userSelect });
   assert(u, 404, "Account not found.");
-  const [grants, history] = await Promise.all([
+  const [grants, history, activity, loginEvents] = await Promise.all([
     db.creditGrant.findMany({
       where: { userId: id },
       take: 100,
@@ -268,15 +308,43 @@ admin.get("/users/:id", async (req, res) => {
       orderBy: { createdAt: "desc" },
       select: auditSelect,
     }),
+    db.auditLog.findMany({
+      where: { OR: [{ actorId: id }, { targetId: id }] },
+      take: 20,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        actorId: true,
+        targetType: true,
+        targetId: true,
+        action: true,
+        before: true,
+        after: true,
+        createdAt: true,
+      },
+    }),
+    db.loginEvent.findMany({
+      where: { userId: id },
+      take: 20,
+      orderBy: { createdAt: "desc" },
+      select: { id: true, event: true, ipAddress: true, userAgent: true, createdAt: true },
+    }),
   ]);
   res.json({
     id: u.id,
     email: u.email,
+    role: u.id === process.env.ADMIN_OWNER_USER_ID ? "admin" : u.role,
     verified: u.emailVerified,
     suspendedAt: u.suspendedAt,
     freeTripClaimedAt: u.entitlement?.freeTripClaimedAt ?? null,
     grants,
     history,
+    activity,
+    loginEvents: loginEvents.map((event) => ({
+      ...event,
+      ipAddress: maskedIp(event.ipAddress),
+      userAgent: event.userAgent?.slice(0, 180) ?? null,
+    })),
   });
 });
 admin.get("/trips", async (req, res) => {
@@ -396,29 +464,107 @@ const auditSelect = {
   change: true,
   createdAt: true,
 } satisfies Prisma.AdminAuditSelect;
+function maskedIp(value: string | null) {
+  if (!value) return null;
+  const ipv4 = value.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/);
+  if (ipv4) return `${ipv4[1]}.${ipv4[2]}.${ipv4[3]}.0`;
+  if (value.includes(":")) return `${value.split(":").slice(0, 3).join(":")}::`;
+  return null;
+}
 admin.get("/activity", async (req, res) => {
   const f = querySchema.parse(req.query);
-  const where: Prisma.AdminAuditWhereInput = {
-    createdAt: { gte: new Date(Date.now() - f.days * 86400000) },
-    ...(f.status ? { action: f.status } : {}),
-    ...(f.user ? { targetId: f.user } : {}),
-    ...(f.q
-      ? {
-          OR: [{ targetId: { contains: f.q } }, { actorId: { contains: f.q } }],
-        }
-      : {}),
+  const { from, to } = activityWindow(f);
+  const [rows, totalRows] = await Promise.all([
+    db.$queryRaw<
+      {
+        id: string;
+        actorId: string;
+        targetId: string;
+        action: string;
+        reason: string;
+        outcome: string;
+        change: Prisma.JsonValue;
+        createdAt: Date;
+        source: string;
+      }[]
+    >`
+      WITH events AS (
+        SELECT id, "actorId", "targetId", action, reason, outcome, change,
+               "createdAt", 'admin'::text AS source
+        FROM "AdminAudit"
+        UNION ALL
+        SELECT id, "actorId", "targetId", action, 'User activity'::text,
+               'success'::text,
+               jsonb_build_object('before', "before", 'after', "after"),
+               "createdAt", 'user'::text
+        FROM "AuditLog"
+      )
+      SELECT id, "actorId", "targetId", action, reason, outcome, change,
+             "createdAt", source
+      FROM events
+      WHERE "createdAt" >= ${from} AND "createdAt" <= ${to}
+        AND (${f.status} = '' OR action = ${f.status})
+        AND (${f.user} = '' OR "targetId" = ${f.user} OR "actorId" = ${f.user})
+        AND (${f.q} = '' OR "targetId" ILIKE '%' || ${f.q} || '%'
+                         OR "actorId" ILIKE '%' || ${f.q} || '%')
+      ORDER BY "createdAt" DESC, id ASC
+      LIMIT ${pageSize} OFFSET ${(f.page - 1) * pageSize}
+    `,
+    db.$queryRaw<{ total: bigint }[]>`
+      WITH events AS (
+        SELECT id, "actorId", "targetId", action, "createdAt" FROM "AdminAudit"
+        UNION ALL
+        SELECT id, "actorId", "targetId", action, "createdAt" FROM "AuditLog"
+      )
+      SELECT count(*) AS total
+      FROM events
+      WHERE "createdAt" >= ${from} AND "createdAt" <= ${to}
+        AND (${f.status} = '' OR action = ${f.status})
+        AND (${f.user} = '' OR "targetId" = ${f.user} OR "actorId" = ${f.user})
+        AND (${f.q} = '' OR "targetId" ILIKE '%' || ${f.q} || '%'
+                         OR "actorId" ILIKE '%' || ${f.q} || '%')
+    `,
+  ]);
+  const total = Number(totalRows[0]?.total ?? 0n);
+  res.json(pageResult(rows, total, f.page));
+});
+admin.get("/login-events", async (req, res) => {
+  const f = querySchema.parse(req.query);
+  const { from, to } = activityWindow(f);
+  const where: Prisma.LoginEventWhereInput = {
+    createdAt: { gte: from, lte: to },
+    ...(f.status ? { event: f.status } : {}),
+    ...(f.user ? { userId: f.user } : {}),
+    ...(f.q ? { AND: [{ userId: { contains: f.q } }] } : {}),
   };
   const [rows, total] = await Promise.all([
-    db.adminAudit.findMany({
+    db.loginEvent.findMany({
       where,
-      select: auditSelect,
+      select: {
+        id: true,
+        userId: true,
+        event: true,
+        ipAddress: true,
+        userAgent: true,
+        createdAt: true,
+      },
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       take: pageSize,
       skip: (f.page - 1) * pageSize,
     }),
-    db.adminAudit.count({ where }),
+    db.loginEvent.count({ where }),
   ]);
-  res.json(pageResult(rows, total, f.page));
+  res.json(
+    pageResult(
+      rows.map((event) => ({
+        ...event,
+        ipAddress: maskedIp(event.ipAddress),
+        userAgent: event.userAgent?.slice(0, 180) ?? null,
+      })),
+      total,
+      f.page,
+    ),
+  );
 });
 
 admin.get("/overview", async (req, res) => {

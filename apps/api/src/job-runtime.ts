@@ -12,12 +12,15 @@ export async function jobDependencies(
   await assertAccountActive(ownerId);
   await checkIntegration(type === "menu" ? "groq-tokens" : "geoapify");
   await checkIntegration("storage");
-  if (type === "menu" && (await menuAllowance(ownerId, isFree)).remaining <= 0)
-    throw new HttpError(
-      402,
-      "No menu allowance or bonus credits remain.",
-      "CREDIT_EXHAUSTED",
-    );
+  if (type === "menu") {
+    const allowance = await menuAllowance(ownerId, isFree);
+    if (!allowance.unlimited && (allowance.remaining ?? 0) <= 0)
+      throw new HttpError(
+        402,
+        "No menu allowance or bonus credits remain.",
+        "CREDIT_EXHAUSTED",
+      );
+  }
 }
 export async function claimJob(id: string) {
   const job = await db.job.findUniqueOrThrow({

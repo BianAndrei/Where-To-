@@ -3,6 +3,8 @@ import { locationSchema, type Place } from "@whereto/shared";
 import { db, assert, HttpError } from "./db.js";
 import { config } from "./config.js";
 import { catalogue } from "./catalogue.js";
+import tzlookup from "tz-lookup";
+import { suggestPlaceName } from "./place-suggest.js";
 import { checkIntegration, recordHealth } from "./integrations.js";
 export function signPlace(place: Place): Place {
   const { token, ...value } = place;
@@ -106,43 +108,204 @@ export async function geoRequest(
   assert(result.ok, 503, "Map service is temporarily unavailable.");
   return result.json();
 }
+const nominatimCache = new Map<string, { at: number; places: Place[] }>();
+let nominatimQueue: Promise<unknown> = Promise.resolve();
+const regionTypes = new Set([
+  "state",
+  "region",
+  "province",
+  "county",
+  "state_district",
+  "territory",
+  "island",
+  "archipelago",
+]);
+const cityTypes = new Set([
+  "city",
+  "town",
+  "village",
+  "municipality",
+  "hamlet",
+  "suburb",
+  "city_district",
+  "borough",
+  "district",
+  "quarter",
+]);
+function placeKind(type: unknown): Place["kind"] | undefined {
+  if (type === "country") return "country";
+  if (typeof type !== "string") return undefined;
+  if (regionTypes.has(type)) return "region";
+  if (cityTypes.has(type)) return "city";
+  return undefined;
+}
+const attractionCategories = new Set([
+  "tourism",
+  "historic",
+  "natural",
+  "man_made",
+  "leisure",
+]);
+function osmKind(r: any): Place["kind"] | undefined {
+  const direct = placeKind(r.addresstype ?? r.type);
+  if (direct) return direct;
+  if (r.category === "boundary" && r.type === "national_park") return "place";
+  if (r.addresstype === "locality" || r.type === "locality") return "place";
+  return attractionCategories.has(r.category) ? "place" : undefined;
+}
+async function nominatimSearch(q: string, cities: boolean) {
+  const key = `${cities}:${q.trim().toLowerCase()}`;
+  const hit = nominatimCache.get(key);
+  if (hit && Date.now() - hit.at < 3_600_000) return hit.places;
+  // Nominatim's public policy allows at most one request per second.
+  const run = nominatimQueue.then(async () => {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("q", q);
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("addressdetails", "1");
+    url.searchParams.set("limit", "8");
+    if (cities) url.searchParams.set("layer", "address,natural,poi");
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": `Whereto/1.0 (${config.APP_URL})`,
+        "Accept-Language": "en",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (!response.ok) throw new Error(`Nominatim ${response.status}`);
+    return (await response.json()) as any[];
+  });
+  nominatimQueue = run.catch(() => undefined);
+  const rows = await run;
+  const seen = new Set<string>();
+  const places: Place[] = [];
+  for (const r of rows) {
+    const lat = Number(r.lat),
+      lon = Number(r.lon);
+    let timezone: string;
+    try {
+      timezone = tzlookup(lat, lon);
+    } catch {
+      continue;
+    }
+    const a = r.address ?? {};
+    const kind = cities ? osmKind(r) : "place";
+    if (cities && !kind) continue;
+    const name = cities
+      ? (r.name || a[r.addresstype] || String(r.display_name).split(",")[0])
+      : (r.name || String(r.display_name).split(",")[0]);
+    if (!name) continue;
+    const country = a.country ?? "";
+    const region =
+      kind === "country"
+        ? undefined
+        : (a.state ?? a.region ?? a.province ?? a.county ?? undefined);
+    const dedupe = `${name}|${region ?? ""}|${country}|${kind}`;
+    if (seen.has(dedupe)) continue;
+    seen.add(dedupe);
+    places.push(
+      signPlace({
+        id: `osm-${r.osm_type}-${r.osm_id}`,
+        name: String(name).slice(0, 200),
+        country: String(country).slice(0, 100),
+        lat,
+        lon,
+        timezone,
+        source: "osm",
+        kind: kind ?? "place",
+        ...(region && region !== name
+          ? { region: String(region).slice(0, 100) }
+          : {}),
+        ...(/^[a-z]{2}$/i.test(a.country_code ?? "")
+          ? { countryCode: a.country_code.toUpperCase() }
+          : {}),
+      }),
+    );
+  }
+  if (nominatimCache.size > 500) nominatimCache.clear();
+  nominatimCache.set(key, { at: Date.now(), places });
+  return places;
+}
 export async function searchPlaces(q: string, cities = false, bias?: string) {
-  if (!process.env.GEOAPIFY_API_KEY)
+  if (!process.env.GEOAPIFY_API_KEY) {
+    const offline = catalogue
+      .filter((p) =>
+        `${p.name} ${p.country}`.toLowerCase().includes(q.toLowerCase()),
+      )
+      .slice(0, 10)
+      .map(signPlace);
+    try {
+      const suggestion = suggestPlaceName(q);
+      if (suggestion) {
+        const corrected = await nominatimSearch(suggestion, cities);
+        if (corrected.length)
+          return {
+            places: corrected,
+            source: "osm",
+            notice: `Showing results for “${suggestion}”.`,
+          };
+      }
+      const places = await nominatimSearch(q, cities);
+      if (places.length)
+        return { places, source: "osm", notice: "Search by OpenStreetMap." };
+    } catch {
+      /* fall through to the offline directory */
+    }
     return {
-      places: catalogue
-        .filter((p) =>
-          `${p.name} ${p.country}`.toLowerCase().includes(q.toLowerCase()),
-        )
-        .slice(0, 10)
-        .map(signPlace),
+      places: offline,
       source: "catalogue",
       notice: cities
-        ? "Offline city directory. Connect Geoapify to search more destinations."
-        : "Live place search is not connected. Use an address or place a pin manually.",
+        ? "Offline city directory. Live search is temporarily unavailable."
+        : "Live place search is temporarily unavailable. Use an address or place a pin manually.",
     };
+  }
   const data = await geoRequest("geocode/search", {
     text: q,
     format: "json",
     limit: "8",
-    ...(cities ? { type: "city" } : {}),
     ...(bias ? { bias: `proximity:${bias}` } : {}),
   });
+  const geoKind = (type: string): Place["kind"] | undefined =>
+    type === "country"
+      ? "country"
+      : ["state", "county", "region"].includes(type)
+        ? "region"
+        : ["city", "suburb", "district", "locality", "postcode"].includes(type)
+          ? "city"
+          : undefined;
   return {
     places: (data.results ?? [])
-      .filter((r: any) => r.timezone?.name)
-      .map((r: any) =>
-        signPlace({
+      .filter(
+        (r: any) =>
+          r.timezone?.name && (!cities || geoKind(r.result_type) !== undefined),
+      )
+      .map((r: any) => {
+        const kind = cities ? geoKind(r.result_type) : "place";
+        const name = cities
+          ? kind === "country"
+            ? r.country
+            : kind === "region"
+              ? (r.state ?? r.county ?? r.name)
+              : (r.city ?? r.name ?? r.formatted)
+          : (r.name ?? r.formatted);
+        return signPlace({
           id: r.place_id,
-          name: cities
-            ? (r.city ?? r.name ?? r.formatted)
-            : (r.name ?? r.formatted),
+          name,
           country: r.country ?? "",
           lat: r.lat,
           lon: r.lon,
           timezone: r.timezone.name,
           source: "geoapify",
-        }),
-      ),
+          kind,
+          ...(kind !== "country" && r.state && r.state !== name
+            ? { region: r.state }
+            : {}),
+          ...(/^[a-z]{2}$/i.test(r.country_code ?? "")
+            ? { countryCode: r.country_code.toUpperCase() }
+            : {}),
+        });
+      }),
     source: "geoapify",
   };
 }

@@ -87,7 +87,13 @@ export const locationSchema = z.object({
         return false;
       }
     }),
-  source: z.enum(["geoapify", "catalogue", "user"]),
+  source: z.enum(["geoapify", "osm", "catalogue", "user"]),
+  kind: z.enum(["country", "region", "city", "place"]).optional(),
+  region: z.string().max(100).optional(),
+  countryCode: z
+    .string()
+    .regex(/^[A-Za-z]{2}$/)
+    .optional(),
   token: z.string().optional(),
 });
 export type Place = z.infer<typeof locationSchema>;

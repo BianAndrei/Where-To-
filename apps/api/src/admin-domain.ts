@@ -3,6 +3,28 @@ import type { Prisma } from "@prisma/client";
 import { db, assert } from "./db.js";
 
 export type Tx = Prisma.TransactionClient;
+export async function recordAudit(
+  tx: Tx,
+  actorId: string,
+  targetType: string,
+  targetId: string,
+  action: string,
+  before?: Prisma.InputJsonObject,
+  after?: Prisma.InputJsonObject,
+  requestId?: string,
+) {
+  await tx.auditLog.create({
+    data: {
+      actorId,
+      targetType,
+      targetId,
+      action,
+      ...(before ? { before } : {}),
+      ...(after ? { after } : {}),
+      ...(requestId ? { requestId } : {}),
+    },
+  });
+}
 export async function milestone(tx: Tx, userId: string, event: string) {
   // Legacy accounts may have earlier firsts that were never recorded.
   if (

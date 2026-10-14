@@ -314,7 +314,7 @@ export async function processMenuJob(id: string) {
       }
       const allowance = await menuAllowance(input.ownerId, job.trip.isFree, tx);
       assert(
-        allowance.remaining > 0,
+        allowance.unlimited || (allowance.remaining ?? 0) > 0,
         402,
         "Menu allowance reached. Your extracted result has not been charged.",
       );
@@ -333,11 +333,13 @@ export async function processMenuJob(id: string) {
           sourceHash: input.sourceHash,
           data: data as unknown as Prisma.InputJsonValue,
           quotaBucket:
-            allowance.normalRemaining > 0 ? allowance.bucket : "bonus",
+            allowance.unlimited || (allowance.normalRemaining ?? 0) > 0
+              ? allowance.bucket
+              : "bonus",
         },
         update: {},
       });
-      if (allowance.normalRemaining === 0)
+      if (!allowance.unlimited && allowance.normalRemaining === 0)
         await consumeCredit(tx, input.ownerId, "menu", `menu:${menu.id}`);
       await tx.job.update({
         where: { id },

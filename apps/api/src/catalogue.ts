@@ -41,5 +41,6 @@ export const catalogue: Place[] = rows.map(
     lon,
     timezone,
     source: "catalogue",
+    kind: "city",
   }),
 );

@@ -9,10 +9,15 @@ const users = await db.user.findMany({
   select: { id: true },
 });
 if (users.length) {
-  await db.trip.deleteMany({
-    where: { ownerId: { in: users.map((u) => u.id) } },
+  const ids = users.map((u) => u.id);
+  await db.auditLog.deleteMany({
+    where: { OR: [{ actorId: { in: ids } }, { targetId: { in: ids } }] },
   });
-  await db.user.deleteMany({ where: { id: { in: users.map((u) => u.id) } } });
+  await db.loginEvent.deleteMany({ where: { userId: { in: ids } } });
+  await db.trip.deleteMany({
+    where: { ownerId: { in: ids } },
+  });
+  await db.user.deleteMany({ where: { id: { in: ids } } });
 }
 console.log(`Cleaned ${users.length} interrupted export-test accounts.`);
 await db.$disconnect();

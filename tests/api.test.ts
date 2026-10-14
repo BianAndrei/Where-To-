@@ -79,6 +79,10 @@ afterAll(async () => {
     where: { trip: { ownerId: { in: userIds } } },
   });
   for (const doc of docs) await deleteFile(doc.storageKey);
+  await db.auditLog.deleteMany({
+    where: { OR: [{ actorId: { in: userIds } }, { targetId: { in: userIds } }] },
+  });
+  await db.loginEvent.deleteMany({ where: { userId: { in: userIds } } });
   await db.trip.deleteMany({ where: { ownerId: { in: userIds } } });
   await db.user.deleteMany({ where: { id: { in: userIds } } });
   await db.devMail.deleteMany({ where: { to: { in: emails } } });
@@ -106,6 +110,16 @@ describe.sequential("Real PostgreSQL and authenticated HTTP acceptance", () => {
     expect(responses.map((r) => r.status).sort()).toEqual([201, 402]);
     trip = await responses.find((r) => r.status === 201)!.json();
     expect(trip.isFree).toBe(true);
+    expect(
+      await db.auditLog.findFirst({
+        where: {
+          actorId: owner.id,
+          targetType: "trip",
+          targetId: trip.id,
+          action: "trip.created",
+        },
+      }),
+    ).not.toBeNull();
   });
   it("restores exactly one replacement free trip after deletion", async () => {
     const replacementOwner = await createUser();

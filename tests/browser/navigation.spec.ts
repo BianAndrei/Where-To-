@@ -23,6 +23,20 @@ test("the mobile planner CTA opens the interactive demo", async ({ page }) => {
   );
 });
 
+test("the lower landing-page planner CTA opens the demo at the top", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.evaluate(() =>
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" }),
+  );
+  await page.locator(".wt-toolbox-bottom a").click();
+  await expect(page).toHaveURL("/demo");
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBe(0);
+});
+
 test("navigation compacts, keeps every view usable and remembers the preference", async ({
   page,
   isMobile,

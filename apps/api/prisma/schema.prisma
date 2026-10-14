@@ -9,6 +9,7 @@ model User {
   id String @id
   name String
   email String @unique
+  role String @default("client")
   emailVerified Boolean @default(false)
   twoFactorEnabled Boolean @default(false)
   suspendedAt DateTime?
@@ -250,6 +251,35 @@ model AdminAudit {
   @@index([targetId, createdAt])
   @@index([action, createdAt])
   @@index([createdAt])
+}
+model LoginEvent {
+  id String @id @default(uuid())
+  userId String?
+  event String
+  ipAddress String?
+  userAgent String?
+  requestId String?
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
+  @@index([event, createdAt])
+  @@index([createdAt])
+  @@map("LoginEvent")
+}
+model AuditLog {
+  id String @id @default(uuid())
+  actorId String
+  targetType String
+  targetId String
+  action String
+  before Json?
+  after Json?
+  requestId String?
+  createdAt DateTime @default(now())
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+  @@map("AuditLog")
 }
 model IntegrationControl {
   provider String @id

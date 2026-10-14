@@ -27,7 +27,12 @@ import { freeTripState, makeId, type Place } from "@whereto/shared";
 import { api, post, ApiError } from "../lib/api";
 import { Logo, Doodle } from "../components/Doodle";
 import { Button, Field, Notice } from "../components/ui";
-import { LocationPicker } from "../components/LocationPicker";
+import {
+  LocationPicker,
+  PlaceIcon,
+  placeKindLabel,
+  placeSubtitle,
+} from "../components/LocationPicker";
 import { AvatarStack } from "../components/PlayfulControls";
 import { JourneyAtmosphere } from "../components/JourneyAtmosphere";
 import { usePreferences } from "../lib/preferences";
@@ -117,8 +122,7 @@ export default function Onboarding() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const loaded = useRef("");
-  const destinationCurrency =
-    destinationCurrencies[places[0]?.country ?? ""];
+  const destinationCurrency = destinationCurrencies[places[0]?.country ?? ""];
   useEffect(() => {
     const userId = me.data?.user.id;
     if (!userId || loaded.current === userId) return;
@@ -313,13 +317,15 @@ export default function Onboarding() {
               />
               <span className="eyebrow">
                 STEP {step + 1} OF 4 ·{" "}
-                {me.data?.entitlement?.freeTripClaimedAt
-                  ? me.data?.pro
-                    ? "INCLUDED WITH YOUR SUBSCRIPTION"
-                    : me.data?.tripCredits
-                      ? "USES ONE BONUS TRIP CREDIT"
-                      : "SUBSCRIPTION REQUIRED FOR A NEW TRIP"
-                  : "YOUR FIRST TRIP IS FREE"}
+                {me.data?.unlimitedOwner
+                  ? "UNLIMITED ADMIN ACCESS"
+                  : me.data?.entitlement?.freeTripClaimedAt
+                    ? me.data?.pro
+                      ? "INCLUDED WITH YOUR SUBSCRIPTION"
+                      : me.data?.tripCredits
+                        ? "USES ONE BONUS TRIP CREDIT"
+                        : "SUBSCRIPTION REQUIRED FOR A NEW TRIP"
+                    : "YOUR FIRST TRIP IS FREE"}
               </span>
               <SetupQuestion>{titles[step]}</SetupQuestion>
               <p>{descriptions[step]}</p>
@@ -404,8 +410,20 @@ export default function Onboarding() {
                 </Field>
                 <div className="destination-chips">
                   {places.map((place) => (
-                    <span key={place.id}>
-                      {place.name}
+                    <span
+                      key={place.id}
+                      className={`kind-${place.kind ?? "city"}`}
+                    >
+                      <PlaceIcon place={place} size={22} />
+                      <span className="chip-text">
+                        <strong>{place.name}</strong>
+                        <small>
+                          {placeKindLabel(place)}
+                          {placeSubtitle(place)
+                            ? ` · ${placeSubtitle(place)}`
+                            : ""}
+                        </small>
+                      </span>
                       <button
                         aria-label={`Remove ${place.name}`}
                         onClick={() =>
