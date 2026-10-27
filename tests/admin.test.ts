@@ -31,13 +31,22 @@ async function request(
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }
-async function authRequest(path: string, person?: Person, body?: unknown) {
+// Each fixture signs up from its own address, as separate people would; the
+// API trusts one proxy hop, so this is the client address it rate-limits on.
+let fixtureAddress = 0;
+async function authRequest(
+  path: string,
+  person?: Person,
+  body?: unknown,
+  address?: string,
+) {
   return fetch(base + "/api/auth" + path, {
     method: body === undefined ? "GET" : "POST",
     headers: {
       Origin: origin,
       "Content-Type": "application/json",
       ...(person ? { Cookie: person.cookie } : {}),
+      ...(address ? { "X-Forwarded-For": address } : {}),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
@@ -56,20 +65,31 @@ async function createPerson(): Promise<Person> {
     cookie: "",
   };
   emails.push(p.email);
-  const response = await authRequest("/sign-up/email", undefined, {
-    name: "Admin fixture",
-    email: p.email,
-    password: p.password,
-  });
+  const address = `198.51.100.${++fixtureAddress}`;
+  const response = await authRequest(
+    "/sign-up/email",
+    undefined,
+    {
+      name: "Admin fixture",
+      email: p.email,
+      password: p.password,
+    },
+    address,
+  );
   expect(response.status).toBe(200);
   p.id = (await response.json()).user.id;
   ids.push(p.id);
   // Deliberately local fixture verification; no real mailbox or user's account is modified.
   await db.user.update({ where: { id: p.id }, data: { emailVerified: true } });
-  const login = await authRequest("/sign-in/email", undefined, {
-    email: p.email,
-    password: p.password,
-  });
+  const login = await authRequest(
+    "/sign-in/email",
+    undefined,
+    {
+      email: p.email,
+      password: p.password,
+    },
+    address,
+  );
   expect(login.status).toBe(200);
   p.cookie = cookies(login);
   return p;
@@ -592,6 +612,121 @@ describe.sequential(
         ).status,
       ).toBe(404);
       expect((await request("/admin/users?page=0", admin)).status).toBe(400);
+    });
+    it("lets only the owner manage administrators and never lets anyone lock the owner out", async () => {
+      // A second administrator with their own verified authenticator.
+      const staff = await createPerson();
+      await db.user.update({
+        where: { id: staff.id },
+        data: { role: "admin" },
+      });
+      const enrollment = await request("/admin/access/enroll", staff, {
+        password: staff.password,
+      });
+      expect(enrollment.status).toBe(200);
+      const staffSecret = new TextDecoder().decode(
+        base32.decode(
+          new URL((await enrollment.json()).totpURI).searchParams.get(
+            "secret",
+          )!,
+        ),
+      );
+      const enabled = await authRequest(
+        "/two-factor/verify-totp",
+        staff,
+        { code: await createOTP(staffSecret).totp() },
+        "198.51.100.200",
+      );
+      expect(enabled.status).toBe(200);
+      staff.cookie = cookies(enabled);
+      // Once active, a signed-in session cannot use Better Auth's unlimited
+      // code check as a guessing oracle; only the locked-out admin check works.
+      const oracle = await authRequest(
+        "/two-factor/verify-totp",
+        staff,
+        { code: "123456" },
+        "198.51.100.201",
+      );
+      expect(oracle.status).toBe(403);
+      expect((await oracle.json()).code).toBe("TWO_FACTOR_ALREADY_VERIFIED");
+      expect(
+        (
+          await request("/admin/access/verify", staff, {
+            code: await createOTP(staffSecret).totp(),
+          })
+        ).status,
+      ).toBe(200);
+      const staffAction = (name: string, target: string, fields = body()) =>
+        request(`/admin/actions/${name}/${target}`, staff, fields);
+      const code = async (response: Response) => (await response.json()).code;
+
+      const client = await createPerson();
+      expect((await staffAction("revoke-sessions", client.id)).status).toBe(
+        200,
+      );
+      for (const name of ["suspend", "revoke-sessions"])
+        expect(await code(await staffAction(name, admin.id))).toBe(
+          "OWNER_PROTECTED",
+        );
+      const peer = await createPerson();
+      await db.user.update({ where: { id: peer.id }, data: { role: "admin" } });
+      expect(await code(await staffAction("suspend", peer.id))).toBe(
+        "OWNER_REQUIRED",
+      );
+      expect(
+        await code(
+          await staffAction("set-role", client.id, body({ role: "admin" })),
+        ),
+      ).toBe("OWNER_REQUIRED");
+      expect(
+        await code(
+          await staffAction(
+            "grant",
+            staff.id,
+            body({ kind: "trip", quantity: 1 }),
+          ),
+        ),
+      ).toBe("SELF_GRANT");
+      expect(
+        await db.user.findUniqueOrThrow({ where: { id: peer.id } }),
+      ).toMatchObject({ role: "admin", suspendedAt: null });
+      expect(
+        (await db.user.findUniqueOrThrow({ where: { id: client.id } })).role,
+      ).toBe("client");
+
+      // The owner promotes and demotes; a demotion closes admin at once.
+      const promote = await action(
+        "set-role",
+        client.id,
+        body({ role: "admin" }),
+      );
+      expect(promote.status).toBe(200);
+      expect(
+        (await db.user.findUniqueOrThrow({ where: { id: client.id } })).role,
+      ).toBe("admin");
+      const demote = await action(
+        "set-role",
+        staff.id,
+        body({ role: "client" }),
+      );
+      expect(demote.status).toBe(200);
+      expect((await demote.json()).change).toMatchObject({
+        before: "admin",
+        after: "client",
+        adminSessionsClosed: 1,
+      });
+      expect((await request("/admin/overview", staff)).status).toBe(403);
+      expect(
+        await code(
+          await action("set-role", admin.id, body({ role: "client" })),
+        ),
+      ).toBe("OWNER_PROTECTED");
+      const audit = await db.adminAudit.findMany({
+        where: { action: "set-role", actorId: admin.id, outcome: "success" },
+      });
+      expect(audit.map((a) => a.targetId).sort()).toEqual(
+        [client.id, staff.id].sort(),
+      );
     });
     it("persists failed TOTP attempt limits without exposing codes and rejects foreign origins", async () => {
       const invalid =

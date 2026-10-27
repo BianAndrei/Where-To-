@@ -273,11 +273,15 @@ it("records failed sign-in requests and successful sign-outs without credentials
     });
     if (!failureEvent) await new Promise((resolve) => setTimeout(resolve, 10));
   }
+  // The attempted address is kept (lowercased) so failures can be throttled
+  // per account; the password never is.
   expect(failureEvent).toMatchObject({
     event: "login_failed",
-    userId: null,
+    userId: ids[0],
+    email: `${ids[0]}@example.test`,
     requestId,
   });
+  expect(JSON.stringify(failureEvent)).not.toContain("incorrect-password");
 
   const signOut = await request(
     "/api/auth/sign-out",

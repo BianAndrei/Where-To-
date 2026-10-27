@@ -16,6 +16,9 @@ if (
     "Vitest requires a non-production database or schema whose name includes 'test'.",
   );
 process.env.NODE_ENV = "test";
+// Fixtures read verification links from the local inbox; no email leaves the machine.
+delete process.env.RESEND_API_KEY;
+process.env.LOCAL_MAILBOX = "true";
 process.env.DATABASE_URL = testDatabaseUrl;
 export default defineConfig({
   test: {

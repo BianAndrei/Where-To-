@@ -120,6 +120,23 @@ function SettingsWorkspace({ account }: { account: any }) {
     queryFn: () => checked(authClient.getSession()),
     enabled: section === "security",
   });
+  const payments = useQuery({
+    queryKey: ["billing-payments"],
+    queryFn: () =>
+      api<
+        {
+          id: string;
+          status: string;
+          amountPaid: number;
+          amountRefunded: number;
+          currency: string;
+          paidAt: string | null;
+          createdAt: string;
+          hostedInvoiceUrl: string | null;
+        }[]
+      >("/billing/payments"),
+    enabled: section === "billing",
+  });
   const accounts = useQuery({
     queryKey: ["linked-accounts"],
     queryFn: () => checked(authClient.listAccounts()),
@@ -386,8 +403,14 @@ function SettingsWorkspace({ account }: { account: any }) {
                       <p>
                         You sign in with{" "}
                         {accounts.data
-                          ?.map((item) => item.providerId)
-                          .join(", ") || "a connected provider"}
+                          ?.map((item) =>
+                            item.providerId === "google"
+                              ? "Google"
+                              : item.providerId === "apple"
+                                ? "Apple"
+                                : item.providerId,
+                          )
+                          .join(" and ") || "a connected provider"}
                         . You can add a password using a secure reset email.
                       </p>
                       <Button
@@ -809,6 +832,44 @@ function SettingsWorkspace({ account }: { account: any }) {
                     <dd>{account.tripCredits || 0}</dd>
                   </div>
                 </dl>
+                {!!payments.data?.length && (
+                  <div className="settings-payments">
+                    <h3>Recent payments</h3>
+                    <ul>
+                      {payments.data.map((payment) => (
+                        <li key={payment.id}>
+                          <span>
+                            {new Date(
+                              payment.paidAt ?? payment.createdAt,
+                            ).toLocaleDateString()}
+                          </span>
+                          <strong>
+                            {new Intl.NumberFormat(undefined, {
+                              style: "currency",
+                              currency: payment.currency.toUpperCase(),
+                            }).format(payment.amountPaid / 100)}
+                          </strong>
+                          <span
+                            className={`settings-payment-status ${payment.status}`}
+                          >
+                            {payment.status.replaceAll("_", " ")}
+                          </span>
+                          {payment.hostedInvoiceUrl ? (
+                            <a
+                              href={payment.hostedInvoiceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Receipt <ArrowUpRight size={14} />
+                            </a>
+                          ) : (
+                            <span />
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {account.entitlement?.stripeCustomerId ? (
                   <Button
                     disabled={busy || !features.data?.payments}

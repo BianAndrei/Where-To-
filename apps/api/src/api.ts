@@ -26,7 +26,8 @@ import {
   defaultPreferences,
 } from "@whereto/shared";
 import { db, assert } from "./db.js";
-import { config, featureConfig } from "./config.js";
+import { appleSignIn } from "./auth.js";
+import { config, featureConfig, localMailbox } from "./config.js";
 import {
   sessionUser,
   tripAccess,
@@ -41,7 +42,12 @@ import {
   transit,
   reserveProvider,
 } from "./providers.js";
-import { checkout, portal } from "./billing.js";
+import {
+  checkout,
+  checkoutOutcome,
+  paymentHistory,
+  portal,
+} from "./billing.js";
 import { putFile, getFile, deleteFile } from "./storage.js";
 import { getQueue } from "./queue.js";
 import { mapTile } from "./map-tiles.js";
@@ -117,7 +123,9 @@ api.get("/health", async (_req, res) => {
   await db.$queryRaw`SELECT 1`;
   res.json({ ok: true });
 });
-api.get("/config", (_req, res) => res.json(featureConfig()));
+api.get("/config", (_req, res) =>
+  res.json({ ...featureConfig(), appleAuth: appleSignIn }),
+);
 api.get("/places", async (req, res) => {
   await sessionUser(req);
   const q = z.string().min(2).max(200).parse(req.query.q);
@@ -131,8 +139,7 @@ api.get("/places", async (req, res) => {
 });
 api.get("/dev-mail", async (req, res) => {
   assert(
-    !config.production &&
-      !process.env.RESEND_API_KEY &&
+    localMailbox() &&
       ["localhost", "127.0.0.1"].includes(new URL(config.APP_URL).hostname),
     404,
     "Not found",
@@ -543,6 +550,16 @@ api.post("/billing/checkout", async (req, res) => {
   res.json(
     await checkout(user, z.enum(["monthly", "annual"]).parse(req.body.plan)),
   );
+});
+api.get("/billing/checkout/:sessionId", async (req, res) => {
+  const user = await sessionUser(req);
+  res.set("Cache-Control", "no-store");
+  res.json(await checkoutOutcome(user.id, String(req.params.sessionId)));
+});
+api.get("/billing/payments", async (req, res) => {
+  const user = await sessionUser(req);
+  res.set("Cache-Control", "no-store");
+  res.json(await paymentHistory(user.id));
 });
 api.post("/billing/portal", async (req, res) => {
   const user = await sessionUser(req);

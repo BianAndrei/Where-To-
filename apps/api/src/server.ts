@@ -1,5 +1,4 @@
 import express from "express";
-import { randomUUID } from "node:crypto";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
@@ -11,10 +10,15 @@ import { stripeWebhook } from "./billing.js";
 import { HttpError, db } from "./db.js";
 import { admin } from "./admin.js";
 import {
+  ADMIN_ENROLL_MS,
   isAdminIdentity,
-  ownerSession,
   requireAdmin,
 } from "./admin-access.js";
+import {
+  CLIENT_IP_HEADER,
+  recordSecurityEvent,
+  requestMetadata,
+} from "./security-events.js";
 export const app = express();
 app.disable("x-powered-by");
 app.use(
@@ -23,37 +27,20 @@ app.use(
     contentSecurityPolicy: false,
   }),
 );
+// Express resolves req.ip from the configured proxy hops. Better Auth reads
+// the same value from this header, so a forged X-Forwarded-For cannot give an
+// attacker a fresh rate-limit bucket on every request.
+app.set("trust proxy", config.trustProxy);
+app.use((req, _res, next) => {
+  if (req.ip) req.headers[CLIENT_IP_HEADER] = req.ip;
+  else delete req.headers[CLIENT_IP_HEADER];
+  next();
+});
 app.post(
   "/api/v1/billing/webhook",
   express.raw({ type: "application/json", limit: "1mb" }),
   stripeWebhook,
 );
-const authRequestMetadata = (req: express.Request) => {
-  const suppliedId = req.get("x-request-id");
-  return {
-    ipAddress: req.ip?.slice(0, 64) ?? null,
-    userAgent: req.get("user-agent")?.slice(0, 512) ?? null,
-    requestId:
-      suppliedId && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(suppliedId)
-        ? suppliedId
-        : randomUUID(),
-  };
-};
-app.use("/api/auth/sign-in/email", (req, res, next) => {
-  if (req.method === "POST")
-    res.once("finish", () => {
-      if (res.statusCode < 400) return;
-      void db.loginEvent
-        .create({
-          data: {
-            event: "login_failed",
-            ...authRequestMetadata(req),
-          },
-        })
-        .catch(() => console.error("Failed to persist a failed login event."));
-    });
-  next();
-});
 app.use("/api/auth/sign-out", async (req, res, next) => {
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(req.headers),
@@ -61,18 +48,39 @@ app.use("/api/auth/sign-out", async (req, res, next) => {
   if (req.method === "POST" && session)
     res.once("finish", () => {
       if (res.statusCode >= 400) return;
-      void db.loginEvent
-        .create({
-          data: {
-            userId: session.user.id,
-            event: "logout",
-            ...authRequestMetadata(req),
-          },
-        })
-        .catch(() => console.error("Failed to persist a logout event."));
+      void recordSecurityEvent("logout", {
+        userId: session.user.id,
+        email: session.user.email.toLowerCase(),
+        ...requestMetadata(fromNodeHeaders(req.headers)),
+      });
     });
   next();
 });
+// Signed in, Better Auth checks authenticator codes without any attempt limit.
+// That is only needed while setting up a new authenticator; once one is active,
+// sign-in challenges and the admin verification (with its lockout) are the only
+// places a code may be tried.
+app.use(
+  ["/api/auth/two-factor/verify-totp", "/api/auth/two-factor/verify-backup-code"],
+  async (req, res, next) => {
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+    if (
+      session &&
+      (await db.twoFactor.count({
+        where: { userId: session.user.id, verified: true },
+      }))
+    ) {
+      res.status(403).json({
+        error: "Your authenticator is already active.",
+        code: "TWO_FACTOR_ALREADY_VERIFIED",
+      });
+      return;
+    }
+    next();
+  },
+);
 // An administrator authenticator cannot be removed using only a password or OAuth session.
 app.use(
   [
@@ -82,17 +90,32 @@ app.use(
   ],
   async (req, res, next) => {
     const s = await auth.api.getSession({
-      headers: new Headers(
-        Object.entries(req.headers).filter(
-          ([, v]) => typeof v === "string",
-        ) as [string, string][],
-      ),
+      headers: fromNodeHeaders(req.headers),
     });
     if (s && (await isAdminIdentity(s.user.id)))
       await requireAdmin(req, res, next);
     else next();
   },
 );
+// Admin enrollment needs a fresh sign-in, so an old or stolen session cannot
+// attach its own authenticator to an administrator account.
+app.use("/api/auth/two-factor/enable", async (req, res, next) => {
+  const s = await auth.api.getSession({
+    headers: fromNodeHeaders(req.headers),
+  });
+  if (
+    s &&
+    (await isAdminIdentity(s.user.id)) &&
+    Date.now() - new Date(s.session.createdAt).getTime() >= ADMIN_ENROLL_MS
+  ) {
+    res.status(403).json({
+      error: "Sign out and sign in again before setting up your authenticator.",
+      code: "FRESH_LOGIN_REQUIRED",
+    });
+    return;
+  }
+  next();
+});
 app.all("/api/auth/*splat", toNodeHandler(auth));
 app.use(
   "/api/v1",

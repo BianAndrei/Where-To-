@@ -11,3 +11,4 @@ playwright-report/
 coverage/
 *.log
 apps/api/generated/
+.DS_Store

@@ -45,6 +45,7 @@ const pageModules = {
   legal: () => import("./pages/Legal"),
   admin: () => import("./pages/Admin"),
   twoFactor: () => import("./pages/TwoFactor"),
+  billing: () => import("./pages/BillingOutcome"),
 };
 const Auth = lazy(pageModules.auth);
 const Dashboard = lazy(pageModules.dashboard);
@@ -56,6 +57,7 @@ const Pricing = lazy(pageModules.pricing);
 const Legal = lazy(pageModules.legal);
 const Admin = lazy(pageModules.admin);
 const TwoFactor = lazy(pageModules.twoFactor);
+const BillingOutcome = lazy(pageModules.billing);
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30000 },
@@ -104,6 +106,8 @@ function RouteArrival({
                         ? pageModules.legal
                         : path === "/two-factor"
                           ? pageModules.twoFactor
+                          : path.startsWith("/billing/")
+                            ? pageModules.billing
                           : /^\/(share|join)\//.test(path)
                             ? pageModules.share
                             : undefined;
@@ -153,6 +157,7 @@ root.render(
                         element={<Presentation />}
                       />
                       <Route path="/two-factor" element={<Presentation />} />
+                      <Route path="/billing/*" element={<Presentation />} />
                       <Route path="/share/:token" element={<Presentation />} />
                       <Route path="/join/:token" element={<Presentation />} />
                     </>
@@ -165,6 +170,14 @@ root.render(
                       <Route path="/app/settings" element={<Settings />} />
                       <Route path="/admin/*" element={<Admin />} />
                       <Route path="/two-factor" element={<TwoFactor />} />
+                      <Route
+                        path="/billing/success"
+                        element={<BillingOutcome />}
+                      />
+                      <Route
+                        path="/billing/canceled"
+                        element={<BillingOutcome />}
+                      />
                       <Route path="/app/new" element={<Onboarding />} />
                       <Route path="/app/trips/:id" element={<Planner />} />
                       <Route path="/share/:token" element={<Share />} />

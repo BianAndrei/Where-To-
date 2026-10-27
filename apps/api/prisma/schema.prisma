@@ -25,6 +25,7 @@ model User {
   entitlement Entitlement?
   trips Trip[]
   members TripMember[]
+  payments Payment[]
   @@map("user")
 }
 model Session {
@@ -186,6 +187,33 @@ model ProviderUsage {
   used Int @default(0)
   @@unique([provider,period])
 }
+// One row per Stripe invoice; amounts are in the currency's minor unit (cents).
+model Payment {
+  id String @id
+  userId String?
+  user User? @relation(fields:[userId], references:[id], onDelete: SetNull)
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  stripePaymentIntentId String? @unique
+  status String
+  billingReason String?
+  amountDue Int
+  amountPaid Int
+  amountRefunded Int @default(0)
+  currency String
+  periodStart DateTime?
+  periodEnd DateTime?
+  paidAt DateTime?
+  hostedInvoiceUrl String?
+  invoicePdfUrl String?
+  disputed Boolean @default(false)
+  fraudWarning Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
 model StripeEvent {
   id String @id
   processedAt DateTime? @default(now())
@@ -255,13 +283,18 @@ model AdminAudit {
 model LoginEvent {
   id String @id @default(uuid())
   userId String?
+  // Lowercased address a sign-in or reset targeted, even when no account matches.
+  email String?
   event String
+  // password, google, apple or email_link; set on sign-in events.
+  method String?
   ipAddress String?
   userAgent String?
   requestId String?
   createdAt DateTime @default(now())
   @@index([userId, createdAt])
   @@index([event, createdAt])
+  @@index([email, createdAt])
   @@index([createdAt])
   @@map("LoginEvent")
 }

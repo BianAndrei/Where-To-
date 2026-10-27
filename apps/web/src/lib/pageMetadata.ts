@@ -27,13 +27,15 @@ export function pageMetadata(pathname: string) {
     ...(entry ?? {
       title: path.startsWith("/admin")
         ? "Private admin workspace | Whereto"
-        : path === "/demo"
-          ? "Try the travel planner | Whereto"
-          : path === "/signup"
-            ? "Plan your first trip free | Whereto"
-            : path === "/login"
-              ? "Welcome back | Whereto"
-              : "Your travel plans | Whereto",
+        : path.startsWith("/billing")
+          ? "Your payment | Whereto"
+          : path === "/demo"
+            ? "Try the travel planner | Whereto"
+            : path === "/signup"
+              ? "Plan your first trip free | Whereto"
+              : path === "/login"
+                ? "Welcome back | Whereto"
+                : "Your travel plans | Whereto",
       description: "Your itinerary, budget and bookings, together in Whereto.",
     }),
     indexable: !!entry,

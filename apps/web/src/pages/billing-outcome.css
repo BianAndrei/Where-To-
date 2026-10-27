@@ -1,0 +1,63 @@
+.billing-outcome .auth-form h2 {
+  text-wrap: balance;
+}
+.billing-outcome-details {
+  display: grid;
+  margin: 26px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fffaf0;
+}
+.billing-outcome-details > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  font-size: 13px;
+}
+.billing-outcome-details > div + div {
+  border-top: 1px solid var(--line);
+}
+.billing-outcome-details dt {
+  color: var(--muted);
+}
+.billing-outcome-details dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.billing-outcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 22px 0 14px;
+}
+.billing-outcome-actions .button {
+  flex: 1 1 180px;
+}
+.billing-outcome-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.billing-outcome-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--rose);
+  animation: billing-outcome-pulse 1.2s ease-in-out infinite;
+}
+@keyframes billing-outcome-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .billing-outcome-dot {
+    animation: none;
+  }
+}

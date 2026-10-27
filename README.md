@@ -298,15 +298,15 @@ Whereto/
 
 ## Modelul de date
 
-Schema Prisma definește 24 de modele:
+Schema Prisma definește 25 de modele. Descrierea fiecărui tabel, vederile `reporting.*` și modul de vizualizare/editare sunt în [docs/database.md](docs/database.md).
 
-| Domeniu                       | Modele                                                                                    |
-| ----------------------------- | ----------------------------------------------------------------------------------------- |
-| Identitate                    | `User`, `Session`, `Account`, `Verification`, `TwoFactor`                                 |
-| Drepturi și abonamente        | `Entitlement`, `StripeEvent`, `CreditGrant`, `CreditUse`                                  |
-| Călătorii și colaborare       | `Trip`, `TripMember`, `TripHistory`, `ShareLink`                                          |
-| Fișiere și operații de fundal | `Document`, `Menu`, `Job`, `JobAttempt`, `WorkerHeartbeat`                                |
-| Administrare și operare       | `AdminProof`, `AdminAudit`, `IntegrationControl`, `ProviderUsage`, `Milestone`, `DevMail` |
+| Domeniu                       | Modele                                                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Identitate                    | `User`, `Session`, `Account`, `Verification`, `TwoFactor`                                                           |
+| Drepturi și abonamente        | `Entitlement`, `Payment`, `StripeEvent`, `CreditGrant`, `CreditUse`                                                 |
+| Călătorii și colaborare       | `Trip`, `TripMember`, `TripHistory`, `ShareLink`                                                                    |
+| Fișiere și operații de fundal | `Document`, `Menu`, `Job`, `JobAttempt`, `WorkerHeartbeat`                                                          |
+| Administrare și operare       | `AdminProof`, `AdminAudit`, `AuditLog`, `LoginEvent`, `IntegrationControl`, `ProviderUsage`, `Milestone`, `DevMail` |
 
 `Trip.state` păstrează documentul validat `TripState`: destinații, participanți, elemente de itinerariu, costuri, plăți, decontări, comentarii, checklist și sondaje. Rezervările, bonurile, transferurile și segmentele de zbor fac parte din elementele acestui document. Fișierele, membrii, linkurile de partajare, joburile și drepturile contului au tabele separate.
 
@@ -338,22 +338,22 @@ Activele de brand sunt fișiere în `/brand/`; routerul actual nu definește o p
 
 Autentificarea este sub `/api/auth/*`, iar API-ul aplicației sub `/api/v1`. Tabelul este o hartă orientativă, nu o specificație OpenAPI completă.
 
-| Grup                 | Endpointuri reprezentative                                                                                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stare și configurare | `GET /health`, `GET /config`, `GET /dev-mail` numai în dezvoltare                                                                                                                     |
-| Cont                 | `GET /me`, `PATCH /me/preferences`                                                                                                                                                    |
-| Călătorii            | `GET/POST /trips`, `GET/DELETE /trips/:id`, `POST /trips/:id/commands`                                                                                                               |
-| Organizare           | `POST /trips/:id/archive`, `GET /trips/:id/history`, `POST /trips/:id/suggest-order`                                                                                                  |
-| Planificare          | `POST /trips/:id/planning/import`, `POST /trips/:id/planning/transfers`; sondajele folosesc comenzile trip                                                                            |
-| Locații și transport | `GET /places`, `GET /maps/tiles/:z/:x/:y`, `POST /routes`, `POST /transit`, `POST /google-places-session`                                                                             |
-| Valută               | `GET /rates`                                                                                                                                                                          |
-| Partajare            | `GET/POST /trips/:id/shares`, `DELETE /trips/:id/shares/:linkId`, `GET /share/:token`, `POST /join/:token`                                                                            |
-| Membri               | `GET /trips/:id/members`, `DELETE /trips/:id/members/:memberId`                                                                                                                       |
-| Documente            | `GET/POST /trips/:id/documents`, `GET /documents/:id/download`, `DELETE /documents/:id`                                                                                               |
-| Meniuri              | `GET /trips/:id/menus`, `POST /trips/:id/menus/import`                                                                                                                                |
-| Exporturi            | `POST /trips/:id/exports`, `GET /trips/:id/jobs`, `GET /jobs/:id/download`                                                                                                            |
-| Billing              | `POST /billing/checkout`, `POST /billing/portal`, `POST /billing/webhook`                                                                                                             |
-| Admin                | `/admin/access`, `/admin/overview`, `/admin/users`, `/admin/trips`, `/admin/subscriptions`, `/admin/jobs`, `/admin/integrations`, `/admin/activity`, `/admin/actions/:action/:target` |
+| Grup                 | Endpointuri reprezentative                                                                                                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stare și configurare | `GET /health`, `GET /config`, `GET /dev-mail` numai în dezvoltare, cu `LOCAL_MAILBOX=true`                                                                                                                                      |
+| Cont                 | `GET /me`, `PATCH /me/preferences`                                                                                                                                                                                              |
+| Călătorii            | `GET/POST /trips`, `GET/DELETE /trips/:id`, `POST /trips/:id/commands`                                                                                                                                                          |
+| Organizare           | `POST /trips/:id/archive`, `GET /trips/:id/history`, `POST /trips/:id/suggest-order`                                                                                                                                            |
+| Planificare          | `POST /trips/:id/planning/import`, `POST /trips/:id/planning/transfers`; sondajele folosesc comenzile trip                                                                                                                      |
+| Locații și transport | `GET /places`, `GET /maps/tiles/:z/:x/:y`, `POST /routes`, `POST /transit`, `POST /google-places-session`                                                                                                                       |
+| Valută               | `GET /rates`                                                                                                                                                                                                                    |
+| Partajare            | `GET/POST /trips/:id/shares`, `DELETE /trips/:id/shares/:linkId`, `GET /share/:token`, `POST /join/:token`                                                                                                                      |
+| Membri               | `GET /trips/:id/members`, `DELETE /trips/:id/members/:memberId`                                                                                                                                                                 |
+| Documente            | `GET/POST /trips/:id/documents`, `GET /documents/:id/download`, `DELETE /documents/:id`                                                                                                                                         |
+| Meniuri              | `GET /trips/:id/menus`, `POST /trips/:id/menus/import`                                                                                                                                                                          |
+| Exporturi            | `POST /trips/:id/exports`, `GET /trips/:id/jobs`, `GET /jobs/:id/download`                                                                                                                                                      |
+| Billing              | `POST /billing/checkout`, `GET /billing/checkout/:sessionId`, `GET /billing/payments`, `POST /billing/portal`, `POST /billing/webhook`                                                                                          |
+| Admin                | `/admin/access`, `/admin/overview`, `/admin/users`, `/admin/trips`, `/admin/subscriptions`, `/admin/payments`, `/admin/jobs`, `/admin/integrations`, `/admin/activity`, `/admin/login-events`, `/admin/actions/:action/:target` |
 
 ## Pornire locală
 
@@ -389,46 +389,52 @@ npm run dev
 
 ### Comenzi disponibile
 
-| Comandă                                      | Scop                                                     |
-| -------------------------------------------- | -------------------------------------------------------- |
-| `npm run dev`                                | Frontend + API + worker în dezvoltare                    |
-| `npm run build`                              | Build shared, API și frontend                            |
-| `npm run typecheck`                          | Verificare TypeScript în toate workspace-urile           |
-| `npm test`                                   | Toate testele Vitest; necesită `TEST_DATABASE_URL` izolată |
-| `npm run test:e2e`                           | Playwright; aplicația trebuie pornită separat            |
-| `npm run db:generate`                        | Generare client Prisma                                   |
-| `npm run db:migrate`                         | Aplicarea migrărilor existente                           |
-| `npm run db:check`                           | Verificarea conexiunii PostgreSQL                        |
-| `npm run admin:owner -- owner@example.com`   | Configurarea unui cont verificat existent ca owner admin |
+| Comandă                                      | Scop                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------ |
+| `npm run dev`                                | Frontend + API + worker în dezvoltare                              |
+| `npm run build`                              | Build shared, API și frontend                                      |
+| `npm run typecheck`                          | Verificare TypeScript în toate workspace-urile                     |
+| `npm test`                                   | Toate testele Vitest; necesită `TEST_DATABASE_URL` izolată         |
+| `npm run test:e2e`                           | Playwright; aplicația trebuie pornită separat                      |
+| `npm run db:generate`                        | Generare client Prisma                                             |
+| `npm run db:migrate`                         | Aplicarea migrărilor existente                                     |
+| `npm run db:browse`                          | Tabele ușor de citit, cu emailuri în loc de ID-uri (doar citire)   |
+| `npm run db:studio`                          | Prisma Studio: vizualizarea și editarea datelor în browser         |
+| `npm run db:seed`                            | Date demo locale (`-- --clean` le șterge)                          |
+| `npm run demo:activity`                      | 8 persoane demo cu călătorii și activitate reală (serverul pornit) |
+| `npm run db:check`                           | Verificarea conexiunii PostgreSQL                                  |
+| `npm run admin:owner -- owner@example.com`   | Configurarea unui cont verificat existent ca owner admin           |
 | `npm run test-admin:seed`                    | Crearea idempotentă a administratorului de test (`admin@test.com`) |
-| `npm run brand:build`                        | Generarea activelor de brand                             |
-| `npm run build:presentation -w @whereto/web` | Build static de prezentare                               |
+| `npm run brand:build`                        | Generarea activelor de brand                                       |
+| `npm run build:presentation -w @whereto/web` | Build static de prezentare                                         |
 
 Pentru un owner nou, exclusiv local, există `npm run admin:owner -- owner@example.com --prepare-local`. Acesta pregătește contul și mesajele locale, fără să verifice automat emailul sau să configureze parola/TOTP. Procedura completă este în [docs/admin.md](docs/admin.md).
 
 ## Configurare și integrări
 
-| Serviciu      | Variabile                                                                                                                                            | Funcționalitate                                                                   |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Bază          | `NODE_ENV`, `PORT`, `APP_URL`, `DATABASE_URL`, `BETTER_AUTH_SECRET`, `DATA_DIR`                                                                      | API, autentificare, DB și stocare locală                                          |
-| Site public   | `VITE_PUBLIC_SITE_URL`                                                                                                                               | Canonical, sitemap și URL-uri absolute pentru previzualizări; se citește la build |
-| Administrare | `ADMIN_OWNER_USER_ID`; rolul PostgreSQL `user.role`                                                                                                  | Autorizare server-side; TOTP și dovada legată de sesiune rămân obligatorii         |
-| Teste auth    | `TEST_DATABASE_URL`, `TEST_ADMIN_PASSWORD`                                                                                                           | Bază/schemă izolată cu nume `test`; parola nu este stocată în cod                  |
-| Geoapify      | `GEOAPIFY_API_KEY`, `GEOAPIFY_DAILY_CREDITS`                                                                                                         | Căutare locuri, hartă, rute și exporturi                                          |
-| Groq          | `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_DAILY_TOKENS`                                                                                                    | Extragere/traducere meniuri; modelul implicit din cod este `openai/gpt-oss-120b`  |
-| Google Places | `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_MONTHLY_REQUESTS`                                                                                              | Componenta oficială de descoperire                                                |
-| Google Routes | `GOOGLE_ROUTES_API_KEY`, `GOOGLE_ROUTES_MONTHLY_REQUESTS`                                                                                            | Transport public și comparații de transfer                                        |
-| Google OAuth  | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                                                                                                           | Login Google; callback `${APP_URL}/api/auth/callback/google`                      |
-| Resend        | `RESEND_API_KEY`, `MAIL_FROM`, `EMAIL_MONTHLY_MESSAGES`                                                                                              | Email de verificare/resetare/schimbare adresă                                     |
-| Stripe        | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_MONTHLY_PRICE_ID`, `STRIPE_YEARLY_PRICE_ID`, `STRIPE_TAX_ENABLED`, `STRIPE_MONTHLY_OPERATIONS` | Checkout, portal, webhook și evidența abonamentelor                               |
-| S3 compatibil | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `STORAGE_MONTHLY_WRITE_BYTES`                                             | Fișiere și exporturi private; fără cheile S3 se folosește `.data`                 |
-| Frankfurter   | Fără cheie                                                                                                                                           | Rate valutare, cu alternativă manuală                                             |
+| Serviciu      | Variabile                                                                                                                                            | Funcționalitate                                                                                                            |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Bază          | `NODE_ENV`, `PORT`, `APP_URL`, `DATABASE_URL`, `BETTER_AUTH_SECRET`, `DATA_DIR`                                                                      | API, autentificare, DB și stocare locală                                                                                   |
+| Securitate    | `TRUST_PROXY`, `LOCAL_MAILBOX`                                                                                                                       | Numărul de proxy-uri de încredere (implicit 1); inbox local opțional, numai în dezvoltare                                  |
+| Site public   | `VITE_PUBLIC_SITE_URL`                                                                                                                               | Canonical, sitemap și URL-uri absolute pentru previzualizări; se citește la build                                          |
+| Administrare  | `ADMIN_OWNER_USER_ID`; rolul PostgreSQL `user.role`                                                                                                  | Autorizare server-side; TOTP și dovada legată de sesiune rămân obligatorii                                                 |
+| Teste auth    | `TEST_DATABASE_URL`, `TEST_ADMIN_PASSWORD`                                                                                                           | Bază/schemă izolată cu nume `test`; parola nu este stocată în cod                                                          |
+| Geoapify      | `GEOAPIFY_API_KEY`, `GEOAPIFY_DAILY_CREDITS`                                                                                                         | Căutare locuri, hartă, rute și exporturi                                                                                   |
+| Groq          | `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_DAILY_TOKENS`                                                                                                    | Extragere/traducere meniuri; modelul implicit din cod este `openai/gpt-oss-120b`                                           |
+| Google Places | `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_MONTHLY_REQUESTS`                                                                                              | Componenta oficială de descoperire                                                                                         |
+| Google Routes | `GOOGLE_ROUTES_API_KEY`, `GOOGLE_ROUTES_MONTHLY_REQUESTS`                                                                                            | Transport public și comparații de transfer                                                                                 |
+| Google OAuth  | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                                                                                                           | „Continue with Google”; callback `${APP_URL}/api/auth/callback/google`                                                     |
+| Apple         | `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`                                                                              | „Continue with Apple”; callback `${APP_URL}/api/auth/callback/apple`; ghid în [docs/social-login.md](docs/social-login.md) |
+| Resend        | `RESEND_API_KEY`, `MAIL_FROM`, `EMAIL_MONTHLY_MESSAGES`                                                                                              | Email de verificare/resetare/schimbare adresă                                                                              |
+| Stripe        | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_MONTHLY_PRICE_ID`, `STRIPE_YEARLY_PRICE_ID`, `STRIPE_TAX_ENABLED`, `STRIPE_MONTHLY_OPERATIONS` | Checkout, portal, webhook și evidența abonamentelor                                                                        |
+| S3 compatibil | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `STORAGE_MONTHLY_WRITE_BYTES`                                             | Fișiere și exporturi private; fără cheile S3 se folosește `.data`                                                          |
+| Frankfurter   | Fără cheie                                                                                                                                           | Rate valutare, cu alternativă manuală                                                                                      |
 
 `GETYOURGUIDE_PARTNER_ID` și `EXTERNAL_FREE_ONLY` apar în fișierul exemplu; existența lor nu confirmă activarea unui widget de partener sau garantarea costului zero la furnizori.
 
 Plafoanele aplicației rezervă consumul înainte de cereri, iar adminul poate opri serviciile. Aceste contoare nu sunt facturi ale furnizorilor și nu pot limita singure toate cererile efectuate de o cheie Google în browser. Configurează și restricțiile/cotele din conturile furnizorilor. Nu există upgrade automat la servicii plătite.
 
-Stripe folosește `/api/v1/billing/webhook` pentru `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid` și `invoice.payment_failed`. Validarea cu chei test trebuie făcută înaintea folosirii plăților reale.
+Stripe folosește `/api/v1/billing/webhook` pentru `checkout.session.completed`, `checkout.session.async_payment_succeeded/failed`, `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`, `charge.refunded`, `charge.dispute.created` și `radar.early_fraud_warning.created`. După plată, clientul ajunge pe `/billing/success`; la renunțare, pe `/billing/canceled`. Configurarea pas cu pas, cardurile de test și lista pentru lansare sunt în [docs/stripe.md](docs/stripe.md).
 
 ## Build și deployment
 
@@ -537,19 +543,25 @@ Acestea sunt opțiuni pentru roadmap, nu condiții pentru funcționarea versiuni
 
 ## Documentație detaliată
 
-| Fișier                                                        | Conținut                                                       |
-| ------------------------------------------------------------- | -------------------------------------------------------------- |
-| [Planning essentials](docs/planning-essentials.md)            | Rezervări, transferuri, bonuri, sondaje, bagaje și limite      |
-| [Flights](docs/flights.md)                                    | Segmente de zbor, aeroporturi, import, fusuri orare și export  |
-| [Onboarding and account](docs/onboarding-and-account.md)      | Setup, ghiduri, preferințe și securitatea contului             |
-| [Admin](docs/admin.md)                                        | Pregătirea ownerului, MFA, intervenții, metrici și verificări  |
-| [Providers](docs/providers.md)                                | Referințe către documentația furnizorilor și reguli de afișare |
-| [Acceptance](docs/acceptance.md)                              | Scenarii manuale de acceptanță                                 |
-| [Product polish](docs/product-polish.md)                      | Registru istoric de cerințe, implementări și verificări        |
-| [Landing design](docs/landing-design.md)                      | Direcția vizuală a landingului                                 |
-| [Interaction motion](docs/interaction-motion.md)              | Interacțiuni și comportamentul animațiilor                     |
-| [Design sources](docs/design-sources.md)                      | Surse de design și componente adaptate                         |
-| [React Bits license](docs/third-party/react-bits-LICENSE.md)  | Licența componentelor React Bits folosite                      |
-| [Airports license](apps/web/public/data/airports-LICENSE.txt) | Licența directorului de aeroporturi                            |
+| Fișier                                                        | Conținut                                                           |
+| ------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [Planning essentials](docs/planning-essentials.md)            | Rezervări, transferuri, bonuri, sondaje, bagaje și limite          |
+| [Flights](docs/flights.md)                                    | Segmente de zbor, aeroporturi, import, fusuri orare și export      |
+| [Onboarding and account](docs/onboarding-and-account.md)      | Setup, ghiduri, preferințe și securitatea contului                 |
+| [Admin](docs/admin.md)                                        | Pregătirea ownerului, MFA, intervenții, metrici și verificări      |
+| [Stripe](docs/stripe.md)                                      | Fluxul plăților, configurare test/live, webhookuri, taxe           |
+| [Database](docs/database.md)                                  | Tabele, vederi `reporting`, vizualizare/editare, date demo         |
+| [Security testing](docs/security-testing.md)                  | Protecțiile conturilor și cum le testezi                           |
+| [Social login](docs/social-login.md)                          | Login cu Google/Apple: configurare și ce se salvează               |
+| [Email](docs/email.md)                                        | Emailuri reale (verificare, resetare parolă) cu Resend             |
+| [What changed](docs/what-changed.md)                          | Rezumat scurt: securitate, plăți, bază de date, login Google/Apple |
+| [Providers](docs/providers.md)                                | Referințe către documentația furnizorilor și reguli de afișare     |
+| [Acceptance](docs/acceptance.md)                              | Scenarii manuale de acceptanță                                     |
+| [Product polish](docs/product-polish.md)                      | Registru istoric de cerințe, implementări și verificări            |
+| [Landing design](docs/landing-design.md)                      | Direcția vizuală a landingului                                     |
+| [Interaction motion](docs/interaction-motion.md)              | Interacțiuni și comportamentul animațiilor                         |
+| [Design sources](docs/design-sources.md)                      | Surse de design și componente adaptate                             |
+| [React Bits license](docs/third-party/react-bits-LICENSE.md)  | Licența componentelor React Bits folosite                          |
+| [Airports license](apps/web/public/data/airports-LICENSE.txt) | Licența directorului de aeroporturi                                |
 
 La actualizarea funcționalităților, modifică inventarul și bifează taskurile doar după implementare și verificare. Configurarea unei chei API, existența unui fișier de test sau un rezultat istoric nu reprezintă singure validarea în producție.

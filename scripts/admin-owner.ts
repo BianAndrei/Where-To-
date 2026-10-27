@@ -32,6 +32,8 @@ if (prepare) {
     });
     await milestone(db, user.id, "account_created");
   }
+  // The links below are read from the local inbox, so this run needs it on.
+  process.env.LOCAL_MAILBOX = "true";
   if (!user.emailVerified) {
     const resetPage = new URL("/reset-password", process.env.APP_URL);
     resetPage.searchParams.set("next", "/admin");
@@ -46,6 +48,13 @@ if (prepare) {
     await auth.api.sendVerificationEmail({
       body: { email, callbackURL: reset.url },
     });
+    const verify = await db.devMail.findFirstOrThrow({
+      where: { to: email, subject: "Verify your Whereto email" },
+      orderBy: { createdAt: "desc" },
+    });
+    console.log(
+      `Open this link to verify the owner email and choose a password:\n  ${verify.url}`,
+    );
   }
 } else if (!user?.emailVerified)
   throw new Error(
@@ -66,6 +75,6 @@ console.log(
 );
 if (!user.emailVerified)
   console.log(
-    "The account has no password yet. Its owner must open the verification message in the local inbox and choose their own password.",
+    "The account has no password yet. Its owner must open the verification link above and choose their own password.",
   );
 await db.$disconnect();

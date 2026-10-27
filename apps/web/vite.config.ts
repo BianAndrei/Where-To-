@@ -12,12 +12,16 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
+      // xfwd appends the browser's address to X-Forwarded-For, the one hop
+      // the API trusts (TRUST_PROXY=1), exactly as nginx does in production.
       proxy: {
         "/api": {
           target: process.env.WHERETO_API_TARGET || "http://127.0.0.1:3001",
+          xfwd: true,
         },
         "/files": {
           target: process.env.WHERETO_API_TARGET || "http://127.0.0.1:3001",
+          xfwd: true,
         },
       },
     },
