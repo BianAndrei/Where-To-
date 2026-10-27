@@ -1,0 +1,109 @@
+// Read-only, easy-to-read views of the database (the "reporting" schema),
+// with emails instead of ids. Open them with `npm run db:browse`.
+// This file is only for browsing: the app, migrations and `prisma generate`
+// use schema.prisma.
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["reporting"]
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["views", "multiSchema"]
+  // Never overwrite the app's client if someone generates from this file.
+  output          = "../../../node_modules/.prisma/reporting-client"
+}
+
+/// People: plan, trips, sign-in methods, last login, failed logins today.
+view users {
+  email               String?
+  name                String?
+  role                String?
+  plan                String?
+  subscription_status String?
+  paid_until          DateTime?
+  trips_owned         Int?
+  email_verified      Boolean?
+  two_factor_enabled  Boolean?
+  sign_in_methods     String?
+  last_login_at       DateTime? @db.Timestamp(6)
+  last_login_method   String?
+  failed_logins_24h   Int?
+  suspended_at        DateTime?
+  created_at          DateTime?
+  id                  String    @unique
+
+  @@schema("reporting")
+}
+
+/// Everything that happened: sign-ins, account and trip changes, admin actions.
+view activity {
+  at          DateTime?
+  source      String?
+  action      String?
+  actor_email String?
+  target      String?
+  reason      String?
+  details     Json?
+  id          String    @unique
+
+  @@schema("reporting")
+}
+
+/// Trips with counts and owner email. Private trip content is not included.
+view trips {
+  owner_email   String?
+  destinations  Int?
+  items         Int?
+  collaborators Int?
+  documents     Int?
+  funding       String?
+  created_at    DateTime?
+  updated_at    DateTime?
+  archived_at   DateTime?
+  owner_id      String?
+  id            String    @unique
+
+  @@schema("reporting")
+}
+
+/// Invoices with emails; amounts in euros.
+view payments {
+  email           String?
+  status          String?
+  amount_paid     Decimal?  @db.Decimal
+  amount_refunded Decimal?  @db.Decimal
+  currency        String?
+  created_at      DateTime?
+  paid_at         DateTime?
+  billing_reason  String?
+  period_start    DateTime?
+  period_end      DateTime?
+  disputed        Boolean?
+  fraud_warning   Boolean?
+  invoice_url     String?
+  user_id         String?
+  invoice_id      String    @unique
+
+  @@schema("reporting")
+}
+
+/// Who is paying right now.
+view subscriptions {
+  email                String?
+  status               String?
+  plan                 String?
+  price                Decimal?  @db.Decimal
+  currency             String?
+  paid_until           DateTime?
+  cancel_at_period_end Boolean?
+  has_access           Boolean?
+  free_trip_claimed_at DateTime?
+  last_synced_at       DateTime?
+  stripe_customer_id   String?
+  user_id              String    @unique
+
+  @@schema("reporting")
+}

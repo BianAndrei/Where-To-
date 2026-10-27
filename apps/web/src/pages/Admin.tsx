@@ -22,6 +22,7 @@ import {
   MagnifyingGlass,
   Check,
   WarningCircle,
+  Receipt,
 } from "@phosphor-icons/react";
 import QRCode from "react-qr-code";
 import { api, post, authClient, ApiError } from "../lib/api";
@@ -47,17 +48,46 @@ type Action = {
   paused?: boolean;
   limit?: number;
   balance?: number;
+  role?: "admin" | "client";
 };
 const sections = [
   { path: "", title: "Overview", icon: ChartBar },
   { path: "users", title: "Users", icon: Users },
   { path: "trips", title: "Trips", icon: MapTrifold },
   { path: "subscriptions", title: "Subscriptions", icon: CreditCard },
+  { path: "payments", title: "Payments", icon: Receipt },
   { path: "jobs", title: "Jobs", icon: Queue },
   { path: "integrations", title: "Integrations", icon: Plugs },
   { path: "activity", title: "Activity log", icon: ClockCounterClockwise },
-  { path: "login-events", title: "Login history", icon: LockKey },
+  { path: "login-events", title: "Sign-in & security", icon: LockKey },
 ];
+const securityEvents = [
+  "login_success",
+  "login_failed",
+  "login_locked",
+  "two_factor_required",
+  "two_factor_failed",
+  "logout",
+  "session_expired",
+  "password_reset_requested",
+  "password_reset_completed",
+  "password_changed",
+  "two_factor_enabled",
+  "two_factor_disabled",
+  "email_verified",
+];
+const warningEvents = ["login_failed", "login_locked", "two_factor_failed"];
+const methodNames: Record<string, string> = {
+  password: "Password",
+  google: "Google",
+  apple: "Apple",
+  email_link: "Email link",
+};
+const money = (cents: number, currency: string) =>
+  new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(cents / 100);
 const date = (value: string | null) =>
   value
     ? new Date(value).toLocaleString("en-GB", {
@@ -260,6 +290,39 @@ function Id({ value }: { value: string }) {
       {value}
     </code>
   );
+}
+
+const words = (key: string) =>
+  key.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+const shown = (value: unknown) =>
+  Array.isArray(value)
+    ? value.join(", ") || "none"
+    : value !== null && typeof value === "object"
+      ? JSON.stringify(value)
+      : String(value);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+// One short line per field: "archived: false → true" instead of raw JSON.
+function changeLines(change: unknown): string[] {
+  if (!isRecord(change)) return change == null ? [] : [shown(change)];
+  const { before, after, ...rest } = change;
+  if (isRecord(before) || isRecord(after)) {
+    const b = isRecord(before) ? before : {};
+    const a = isRecord(after) ? after : {};
+    return [...new Set([...Object.keys(b), ...Object.keys(a)])].map((key) =>
+      key in b && key in a && shown(b[key]) !== shown(a[key])
+        ? `${words(key)}: ${shown(b[key])} → ${shown(a[key])}`
+        : `${words(key)}: ${shown(key in a ? a[key] : b[key])}`,
+    );
+  }
+  return [
+    ...(before !== undefined || after !== undefined
+      ? [`balance: ${shown(before ?? 0)} → ${shown(after ?? 0)}`]
+      : []),
+    ...Object.entries(rest).map(
+      ([key, value]) => `${words(key)}: ${shown(value)}`,
+    ),
+  ];
 }
 
 function Overview({ data }: { data: Row }) {
@@ -473,6 +536,10 @@ function actionExplanation(a: Action, quantity: number, limit: number) {
       return "Sign this account out on all devices. It can sign in again. Trip data and subscriptions stay unchanged.";
     case "retry":
       return "Queue another attempt for this failed job. Original permissions, source checks and quotas still apply. Completed results are reused; an import is charged only once.";
+    case "set-role":
+      return a.role === "admin"
+        ? "Make this account an administrator. They must set up an authenticator before admin opens, and every change they make is recorded. Only you, the owner, can undo this."
+        : "Remove administrator access. Any open admin session for this account closes immediately. Their trips and subscription stay unchanged.";
     case "resync":
     case "resync-event":
       return "Read this account’s current subscription from Stripe and refresh its effective access. This does not create a payment, refund or subscription.";
@@ -552,6 +619,7 @@ function ActionDialog({
                     ...(a.action === "integration" && a.paused == null
                       ? { limit }
                       : {}),
+                    ...(a.role ? { role: a.role } : {}),
                   },
                 );
                 if (result.outcome !== "success") {
@@ -869,7 +937,9 @@ export default function Admin() {
                       : "Operational data only. Private trip content stays private."}
                 </p>
               </div>
-              {["overview", "activity", "login-events"].includes(page) && (
+              {["overview", "activity", "login-events", "payments"].includes(
+                page,
+              ) && (
                 <Field label="Period">
                   <Select
                     aria-label="Period"
@@ -915,6 +985,7 @@ export default function Admin() {
                   {[
                     "users",
                     "subscriptions",
+                    "payments",
                     "jobs",
                     "activity",
                     "login-events",
@@ -962,44 +1033,51 @@ export default function Admin() {
                                     "failed",
                                   ]
                                 : page === "login-events"
-                                  ? [
-                                      "login_success",
-                                      "login_failed",
-                                      "logout",
-                                      "session_expired",
-                                      "password_changed",
-                                    ]
-                                  : [
-                                      "grant",
-                                      "revoke-credit",
-                                      "suspend",
-                                      "reactivate",
-                                      "revoke-sessions",
-                                      "retry",
-                                      "integration",
-                                      "resync",
-                                      "resync-event",
-                                      "admin.verify",
-                                      "account.created",
-                                      "account.updated",
-                                      "security.password_changed",
-                                      "preferences.updated",
-                                      "trip.created",
-                                      "trip.item.save",
-                                      "trip.item.delete",
-                                      "trip.archived",
-                                      "trip.unarchived",
-                                      "trip.deleted",
-                                      "trip.share_created",
-                                      "trip.share_revoked",
-                                      "trip.collaborator_joined",
-                                      "trip.collaborator_removed",
-                                      "document.created",
-                                      "document.deleted",
-                                    ]
+                                  ? securityEvents
+                                  : page === "payments"
+                                    ? [
+                                        "paid",
+                                        "failed",
+                                        "open",
+                                        "refunded",
+                                        "partially_refunded",
+                                        "void",
+                                        "uncollectible",
+                                        "flagged",
+                                      ]
+                                    : [
+                                        "grant",
+                                        "revoke-credit",
+                                        "suspend",
+                                        "reactivate",
+                                        "revoke-sessions",
+                                        "retry",
+                                        "integration",
+                                        "resync",
+                                        "resync-event",
+                                        "set-role",
+                                        "admin.verify",
+                                        "account.created",
+                                        "account.updated",
+                                        "security.password_changed",
+                                        "security.password_reset",
+                                        "preferences.updated",
+                                        "trip.created",
+                                        "trip.item.save",
+                                        "trip.item.delete",
+                                        "trip.archived",
+                                        "trip.unarchived",
+                                        "trip.deleted",
+                                        "trip.share_created",
+                                        "trip.share_revoked",
+                                        "trip.collaborator_joined",
+                                        "trip.collaborator_removed",
+                                        "document.created",
+                                        "document.deleted",
+                                      ]
                           ).map((s) => (
                             <SelectOption key={s} value={s}>
-                              {s.replaceAll("-", " ")}
+                              {s.replaceAll("-", " ").replaceAll("_", " ")}
                             </SelectOption>
                           ))}
                         </Select>
@@ -1030,7 +1108,9 @@ export default function Admin() {
                           </Select>
                         </Field>
                       )}
-                      {["activity", "login-events"].includes(page) && (
+                      {["activity", "login-events", "payments"].includes(
+                        page,
+                      ) && (
                         <>
                           <Field label="User ID">
                             <input
@@ -1314,6 +1394,106 @@ export default function Admin() {
                       )}
                     </>
                   )}
+                  {page === "payments" && (
+                    <>
+                      <div className="admin-payment-totals">
+                        {data.data.totals.length ? (
+                          data.data.totals.map((t: Row) => (
+                            <section className="admin-panel" key={t.currency}>
+                              <span className="eyebrow">
+                                COLLECTED · {t.currency.toUpperCase()}
+                              </span>
+                              <strong>
+                                {money(t.collected * 100, t.currency)}
+                              </strong>
+                              <small>
+                                {t.payments} invoices ·{" "}
+                                {money(t.refunded * 100, t.currency)} refunded
+                              </small>
+                            </section>
+                          ))
+                        ) : (
+                          <p className="admin-caption">
+                            No invoices in this period.
+                          </p>
+                        )}
+                      </div>
+                      <p className="admin-caption">{data.data.note}</p>
+                      <AdminTable
+                        columns={["Invoice", "Account", "Amount", "Status", ""]}
+                        rows={rows}
+                        render={(p) => (
+                          <>
+                            <td>
+                              <Id value={p.id} />
+                              <small>{date(p.paidAt ?? p.createdAt)}</small>
+                              <small>
+                                {p.billingReason === "subscription_create"
+                                  ? "First payment"
+                                  : p.billingReason === "subscription_cycle"
+                                    ? "Renewal"
+                                    : (p.billingReason?.replaceAll("_", " ") ??
+                                      "Invoice")}
+                              </small>
+                            </td>
+                            <td>
+                              {p.userId ? (
+                                <button
+                                  className="admin-text-button"
+                                  onClick={() => setUserId(p.userId)}
+                                >
+                                  {p.email ?? "View account"}
+                                </button>
+                              ) : (
+                                "Account not linked"
+                              )}
+                            </td>
+                            <td>
+                              <strong>{money(p.amountPaid, p.currency)}</strong>
+                              {p.amountRefunded > 0 && (
+                                <small>
+                                  {money(p.amountRefunded, p.currency)} refunded
+                                </small>
+                              )}
+                              {p.periodEnd && (
+                                <small>Covers until {date(p.periodEnd)}</small>
+                              )}
+                            </td>
+                            <td>
+                              <Tag
+                                tone={
+                                  p.status === "paid"
+                                    ? "good"
+                                    : ["failed", "uncollectible"].includes(
+                                          p.status,
+                                        )
+                                      ? "warning"
+                                      : "neutral"
+                                }
+                              >
+                                {p.status.replaceAll("_", " ")}
+                              </Tag>
+                              {p.disputed && <Tag tone="warning">Disputed</Tag>}
+                              {p.fraudWarning && (
+                                <Tag tone="warning">Fraud warning</Tag>
+                              )}
+                            </td>
+                            <td>
+                              {p.hostedInvoiceUrl && (
+                                <a
+                                  href={p.hostedInvoiceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Invoice ↗
+                                </a>
+                              )}
+                            </td>
+                          </>
+                        )}
+                      />
+                    </>
+                  )}
                   {page === "jobs" && (
                     <>
                       <p className="admin-caption">
@@ -1498,11 +1678,22 @@ export default function Admin() {
                           <>
                             <td>
                               {date(a.createdAt)}
-                              <Id value={a.actorId} />
+                              {a.actorEmail ? (
+                                <button
+                                  className="admin-text-button"
+                                  onClick={() => setUserId(a.actorId)}
+                                >
+                                  {a.actorEmail}
+                                </button>
+                              ) : (
+                                <Id value={a.actorId} />
+                              )}
                               <Tag>{a.source}</Tag>
                             </td>
                             <td>
-                              <strong>{a.action.replaceAll("-", " ")}</strong>
+                              <strong>
+                                {a.action.replaceAll(/[-_.]/g, " ")}
+                              </strong>
                               <Tag
                                 tone={
                                   a.outcome === "success" ? "good" : "warning"
@@ -1510,13 +1701,36 @@ export default function Admin() {
                               >
                                 {a.outcome}
                               </Tag>
-                              <Id value={a.targetId} />
+                              {a.targetEmail ? (
+                                a.targetId !== a.actorId && (
+                                  <small>
+                                    on{" "}
+                                    <button
+                                      className="admin-text-button"
+                                      onClick={() => setUserId(a.targetId)}
+                                    >
+                                      {a.targetEmail}
+                                    </button>
+                                  </small>
+                                )
+                              ) : a.tripOwnerEmail ? (
+                                <>
+                                  <small>
+                                    Trip owned by {a.tripOwnerEmail}
+                                  </small>
+                                  <Id value={a.targetId} />
+                                </>
+                              ) : (
+                                <Id value={a.targetId} />
+                              )}
                             </td>
                             <td>{a.reason}</td>
                             <td>
-                              <pre className="admin-change">
-                                {JSON.stringify(a.change, null, 2)}
-                              </pre>
+                              <ul className="admin-change">
+                                {changeLines(a.change).map((line) => (
+                                  <li key={line}>{line}</li>
+                                ))}
+                              </ul>
                             </td>
                           </>
                         )}
@@ -1526,9 +1740,10 @@ export default function Admin() {
                   {page === "login-events" && (
                     <>
                       <p className="admin-caption">
-                        Successful and failed sign-ins, sign-outs and expired
-                        sessions. Timestamps are stored in UTC and shown in your
-                        local timezone.
+                        Sign-ins, failures and lockouts, authenticator checks,
+                        password resets and security changes. Search by email to
+                        see every attempt on one address, including addresses
+                        with no account. Times are shown in your local timezone.
                       </p>
                       <AdminTable
                         columns={[
@@ -1544,13 +1759,19 @@ export default function Admin() {
                             <td>
                               <Tag
                                 tone={
-                                  event.event === "login_failed"
+                                  warningEvents.includes(event.event)
                                     ? "warning"
                                     : "neutral"
                                 }
                               >
                                 {event.event.replaceAll("_", " ")}
                               </Tag>
+                              {event.method && (
+                                <small>
+                                  via{" "}
+                                  {methodNames[event.method] ?? event.method}
+                                </small>
+                              )}
                             </td>
                             <td>
                               {event.userId ? (
@@ -1559,12 +1780,15 @@ export default function Admin() {
                                     className="admin-text-button"
                                     onClick={() => setUserId(event.userId)}
                                   >
-                                    View account
+                                    {event.email ?? "View account"}
                                   </button>
                                   <Id value={event.userId} />
                                 </>
                               ) : (
-                                "Unknown account"
+                                <>
+                                  {event.email ?? "Unknown account"}
+                                  <small>No matching account</small>
+                                </>
                               )}
                             </td>
                             <td>
@@ -1650,8 +1874,16 @@ export default function Admin() {
               <h3>{user.data.email}</h3>
               <Id value={user.data.id} />
               <p>
-                {user.data.role === "admin" ? "Administrator" : "Client"} ·{" "}
-                {user.data.verified ? "Email verified" : "Email unverified"} ·{" "}
+                {user.data.owner
+                  ? "Owner"
+                  : user.data.role === "admin"
+                    ? "Administrator"
+                    : "Client"}{" "}
+                · {user.data.verified ? "Email verified" : "Email unverified"} ·{" "}
+                {user.data.twoFactorEnabled
+                  ? "Authenticator on"
+                  : "No authenticator"}{" "}
+                ·{" "}
                 {user.data.freeTripClaimedAt
                   ? "Lifetime free trip already claimed"
                   : "Lifetime free trip not yet claimed"}
@@ -1673,33 +1905,72 @@ export default function Admin() {
                     Grant {kind} credits
                   </Button>
                 ))}
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    openAction({
-                      action: user.data!.suspendedAt ? "reactivate" : "suspend",
-                      target: userId!,
-                      label: user.data!.suspendedAt
-                        ? "Reactivate account"
-                        : "Suspend account",
-                    })
-                  }
-                >
-                  {user.data.suspendedAt ? "Reactivate" : "Suspend"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    openAction({
-                      action: "revoke-sessions",
-                      target: userId!,
-                      label: "Revoke account sessions",
-                    })
-                  }
-                >
-                  Revoke sessions
-                </Button>
+                {!user.data.owner &&
+                  (user.data.role !== "admin" || access.data.owner) && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        onClick={() =>
+                          openAction({
+                            action: user.data!.suspendedAt
+                              ? "reactivate"
+                              : "suspend",
+                            target: userId!,
+                            label: user.data!.suspendedAt
+                              ? "Reactivate account"
+                              : "Suspend account",
+                          })
+                        }
+                      >
+                        {user.data.suspendedAt ? "Reactivate" : "Suspend"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() =>
+                          openAction({
+                            action: "revoke-sessions",
+                            target: userId!,
+                            label: "Revoke account sessions",
+                          })
+                        }
+                      >
+                        Revoke sessions
+                      </Button>
+                    </>
+                  )}
+                {access.data.owner &&
+                  !user.data.owner &&
+                  (user.data.role === "admin" ||
+                    (user.data.verified && !user.data.suspendedAt)) && (
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        openAction({
+                          action: "set-role",
+                          target: userId!,
+                          role:
+                            user.data!.role === "admin" ? "client" : "admin",
+                          label:
+                            user.data!.role === "admin"
+                              ? "Remove admin access"
+                              : "Make administrator",
+                        })
+                      }
+                    >
+                      {user.data.role === "admin"
+                        ? "Remove admin access"
+                        : "Make administrator"}
+                    </Button>
+                  )}
               </div>
+              {(user.data.owner ||
+                (user.data.role === "admin" && !access.data.owner)) && (
+                <p className="admin-caption">
+                  {user.data.owner
+                    ? "The owner account is set on the server (ADMIN_OWNER_USER_ID) and cannot be suspended here."
+                    : "Only the owner can suspend an administrator or change their role."}
+                </p>
+              )}
               <h3>Bonus credits</h3>
               <p className="admin-caption">
                 No expiry. Only the unused part of a grant can be revoked.
@@ -1739,6 +2010,44 @@ export default function Admin() {
                   </div>
                 ))
               )}
+              <h3>Sign-in methods</h3>
+              <p>
+                {user.data.signInMethods.length
+                  ? user.data.signInMethods
+                      .map(
+                        (m: Row) =>
+                          `${methodNames[m.method] ?? m.method} (since ${date(m.linkedAt)})`,
+                      )
+                      .join(" · ")
+                  : "No sign-in method linked."}
+              </p>
+              <h3>Payments</h3>
+              {user.data.payments.length ? (
+                user.data.payments.map((payment: Row) => (
+                  <p key={payment.id}>
+                    <strong>
+                      {money(payment.amountPaid, payment.currency)}
+                    </strong>{" "}
+                    · {payment.status.replaceAll("_", " ")} ·{" "}
+                    {date(payment.paidAt ?? payment.createdAt)}
+                    {payment.hostedInvoiceUrl && (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <a
+                          href={payment.hostedInvoiceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Invoice ↗
+                        </a>
+                      </>
+                    )}
+                  </p>
+                ))
+              ) : (
+                <p>No payments recorded.</p>
+              )}
               <h3>Recent interventions</h3>
               {user.data.history.length ? (
                 user.data.history.map((h: Row) => (
@@ -1765,12 +2074,14 @@ export default function Admin() {
               ) : (
                 <p>No account activity recorded.</p>
               )}
-              <h3>Recent login history</h3>
+              <h3>Recent sign-in &amp; security events</h3>
               {user.data.loginEvents.length ? (
                 user.data.loginEvents.map((event: Row) => (
                   <p key={event.id}>
-                    <strong>{event.event.replaceAll("_", " ")}</strong> ·{" "}
-                    {date(event.createdAt)}
+                    <strong>{event.event.replaceAll("_", " ")}</strong>
+                    {event.method &&
+                      ` via ${methodNames[event.method] ?? event.method}`}{" "}
+                    · {date(event.createdAt)}
                     <small>
                       {event.ipAddress ?? "IP unavailable"} ·{" "}
                       {event.userAgent ?? "Browser details unavailable"}

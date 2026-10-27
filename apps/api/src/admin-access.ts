@@ -7,8 +7,14 @@ import { randomUUID } from "node:crypto";
 
 export const ADMIN_READ_MS = 8 * 60 * 60 * 1000;
 export const ADMIN_WRITE_MS = 10 * 60 * 1000;
+// Authenticator enrollment must follow a sign-in this recent.
+export const ADMIN_ENROLL_MS = 10 * 60 * 1000;
+// The configured owner outranks every other administrator.
+export const isOwnerId = (userId: string) =>
+  !!process.env.ADMIN_OWNER_USER_ID &&
+  userId === process.env.ADMIN_OWNER_USER_ID;
 export async function isAdminIdentity(userId: string) {
-  if (userId === process.env.ADMIN_OWNER_USER_ID) return true;
+  if (isOwnerId(userId)) return true;
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { role: true },
@@ -30,8 +36,7 @@ export async function ownerSession(req: Request) {
     },
   });
   assert(
-    user &&
-      (user.id === process.env.ADMIN_OWNER_USER_ID || user.role === "admin"),
+    user && (isOwnerId(user.id) || user.role === "admin"),
     403,
     "This account does not have admin access.",
     "ADMIN_FORBIDDEN",
@@ -43,7 +48,10 @@ export async function ownerSession(req: Request) {
     "EMAIL_UNVERIFIED",
   );
   await assertAccountActive(user.id);
-  return { ...session, user: { ...session.user, ...user } };
+  return {
+    ...session,
+    user: { ...session.user, ...user, owner: isOwnerId(user.id) },
+  };
 }
 export async function requireAdmin(
   req: Request,

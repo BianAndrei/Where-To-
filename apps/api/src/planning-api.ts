@@ -16,7 +16,7 @@ import { db, assert } from "./db.js";
 import { sessionUser, tripAccess } from "./access.js";
 import { putFile, deleteFile } from "./storage.js";
 import { route, transit } from "./providers.js";
-import { milestone } from "./admin-domain.js";
+import { milestone, recordAudit } from "./admin-domain.js";
 
 export const planningApi = Router();
 const upload = multer({
@@ -216,6 +216,25 @@ planningApi.post(
                 : "reservation.import",
           },
         });
+        // Booking references and confirmation text stay out of the log.
+        await recordAudit(
+          tx,
+          user.id,
+          "trip",
+          trip.id,
+          command.type === "receipt.save"
+            ? "trip.receipt_imported"
+            : "trip.reservation_imported",
+          { version: input.version },
+          {
+            version: input.version + 1,
+            itemId,
+            ...(command.type === "item.save"
+              ? { kind: command.item.kind }
+              : {}),
+            document: !existing,
+          },
+        );
         await milestone(tx, trip.ownerId, "first_item");
         if (state.items.some((i) => !i.deletedAt && i.lines.length))
           await milestone(tx, trip.ownerId, "first_cost");

@@ -5742,3 +5742,32 @@ small.muted {
     color: inherit;
   }
 }
+.social-sign-in {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.social-sign-in .button {
+  padding: 12px 14px;
+  gap: 9px;
+  white-space: nowrap;
+}
+.social-sign-in .button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.social-sign-in-hint {
+  margin-top: 10px;
+  text-align: center;
+}
+@media (max-width: 400px) {
+  .social-sign-in-prefix {
+    display: none;
+  }
+}
+.auth-keep-signed-in {
+  margin: 4px 0 6px;
+  font-size: 13px;
+  align-items: center;
+}

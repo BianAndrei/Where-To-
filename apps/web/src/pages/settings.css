@@ -240,6 +240,57 @@
   margin: 0;
   text-align: right;
 }
+.settings-payments {
+  margin: 0 0 22px;
+  font-size: 13px;
+}
+.settings-payments h3 {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+.settings-payments ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.settings-payments li {
+  display: grid;
+  grid-template-columns: 1fr auto auto 72px;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  border-top: 1px solid #e4dfd1;
+}
+.settings-payments li a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 44px;
+}
+.settings-payment-status {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #f2eee2;
+  color: #625b49;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+.settings-payment-status.paid {
+  background: #e3efe0;
+  color: #3d6435;
+}
+.settings-payment-status.failed,
+.settings-payment-status.uncollectible {
+  background: #fbe8e4;
+  color: #913d33;
+}
+@media (max-width: 480px) {
+  .settings-payments li {
+    grid-template-columns: 1fr auto;
+    padding: 8px 0;
+  }
+}
 .settings-links {
   display: flex;
   gap: 22px;

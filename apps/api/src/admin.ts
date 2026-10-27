@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { fromNodeHeaders } from "better-auth/node";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { db, assert, HttpError } from "./db.js";
 import { auth } from "./auth.js";
 import { config } from "./config.js";
@@ -20,9 +20,12 @@ import {
   ownerSession,
   requireAdmin,
   verifyAdminCode,
+  isOwnerId,
+  ADMIN_ENROLL_MS,
   ADMIN_READ_MS,
   ADMIN_WRITE_MS,
 } from "./admin-access.js";
+import { securityEventNames } from "./security-events.js";
 import { integrationSnapshot, integrationSpecs } from "./integrations.js";
 import { jobDependencies, dispatchJob } from "./job-runtime.js";
 import { resyncSubscription, resyncStripeEvent } from "./billing.js";
@@ -51,6 +54,7 @@ admin.get("/access", async (req, res) => {
   });
   res.json({
     verified,
+    owner: s.user.owner,
     enrolled: s.user.twoFactorEnabled,
     passwordRequired: credential > 0,
     freshUntil: verified
@@ -78,7 +82,7 @@ admin.post("/access/enroll", mfaLimit, async (req, res) => {
     "An authenticator is already enrolled.",
   );
   assert(
-    Date.now() - s.session.createdAt.getTime() < 600000,
+    Date.now() - s.session.createdAt.getTime() < ADMIN_ENROLL_MS,
     403,
     "Sign out and sign in again before setting up your authenticator.",
     "FRESH_LOGIN_REQUIRED",
@@ -164,6 +168,7 @@ const userSelect = {
   email: true,
   role: true,
   emailVerified: true,
+  twoFactorEnabled: true,
   createdAt: true,
   suspendedAt: true,
   entitlement: true,
@@ -235,10 +240,7 @@ admin.get("/users", async (req, res) => {
   if (f.status === "suspended") filters.push({ suspendedAt: { not: null } });
   if (f.role === "admin" && process.env.ADMIN_OWNER_USER_ID)
     filters.push({
-      OR: [
-        { role: "admin" },
-        { id: process.env.ADMIN_OWNER_USER_ID },
-      ],
+      OR: [{ role: "admin" }, { id: process.env.ADMIN_OWNER_USER_ID }],
     });
   else if (f.role === "client" && process.env.ADMIN_OWNER_USER_ID)
     filters.push({
@@ -263,9 +265,10 @@ admin.get("/users", async (req, res) => {
         users.map(async (u) => ({
           id: u.id,
           email: u.email,
-          role:
-            u.id === process.env.ADMIN_OWNER_USER_ID ? "admin" : u.role,
+          role: isOwnerId(u.id) ? "admin" : u.role,
+          owner: isOwnerId(u.id),
           verified: u.emailVerified,
+          twoFactorEnabled: u.twoFactorEnabled,
           createdAt: u.createdAt,
           suspendedAt: u.suspendedAt,
           trips: u._count.trips,
@@ -287,54 +290,76 @@ admin.get("/users/:id", async (req, res) => {
   const id = String(req.params.id);
   const u = await db.user.findUnique({ where: { id }, select: userSelect });
   assert(u, 404, "Account not found.");
-  const [grants, history, activity, loginEvents] = await Promise.all([
-    db.creditGrant.findMany({
-      where: { userId: id },
-      take: 100,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        kind: true,
-        quantity: true,
-        consumed: true,
-        revoked: true,
-        reason: true,
-        createdAt: true,
-      },
-    }),
-    db.adminAudit.findMany({
-      where: { targetId: id },
-      take: 20,
-      orderBy: { createdAt: "desc" },
-      select: auditSelect,
-    }),
-    db.auditLog.findMany({
-      where: { OR: [{ actorId: id }, { targetId: id }] },
-      take: 20,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        actorId: true,
-        targetType: true,
-        targetId: true,
-        action: true,
-        before: true,
-        after: true,
-        createdAt: true,
-      },
-    }),
-    db.loginEvent.findMany({
-      where: { userId: id },
-      take: 20,
-      orderBy: { createdAt: "desc" },
-      select: { id: true, event: true, ipAddress: true, userAgent: true, createdAt: true },
-    }),
-  ]);
+  const [grants, history, activity, loginEvents, payments, accounts] =
+    await Promise.all([
+      db.creditGrant.findMany({
+        where: { userId: id },
+        take: 100,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          kind: true,
+          quantity: true,
+          consumed: true,
+          revoked: true,
+          reason: true,
+          createdAt: true,
+        },
+      }),
+      db.adminAudit.findMany({
+        where: { targetId: id },
+        take: 20,
+        orderBy: { createdAt: "desc" },
+        select: auditSelect,
+      }),
+      db.auditLog.findMany({
+        where: { OR: [{ actorId: id }, { targetId: id }] },
+        take: 20,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          actorId: true,
+          targetType: true,
+          targetId: true,
+          action: true,
+          before: true,
+          after: true,
+          createdAt: true,
+        },
+      }),
+      db.loginEvent.findMany({
+        where: { OR: [{ userId: id }, { email: u.email.toLowerCase() }] },
+        take: 20,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          event: true,
+          email: true,
+          method: true,
+          ipAddress: true,
+          userAgent: true,
+          createdAt: true,
+        },
+      }),
+      db.payment.findMany({
+        where: { userId: id },
+        take: 20,
+        orderBy: { createdAt: "desc" },
+        select: paymentSelect,
+      }),
+      db.account.findMany({
+        where: { userId: id },
+        orderBy: { createdAt: "asc" },
+        select: { providerId: true, createdAt: true },
+      }),
+    ]);
   res.json({
     id: u.id,
     email: u.email,
-    role: u.id === process.env.ADMIN_OWNER_USER_ID ? "admin" : u.role,
+    role: isOwnerId(u.id) ? "admin" : u.role,
+    owner: isOwnerId(u.id),
     verified: u.emailVerified,
+    twoFactorEnabled: u.twoFactorEnabled,
     suspendedAt: u.suspendedAt,
     freeTripClaimedAt: u.entitlement?.freeTripClaimedAt ?? null,
     grants,
@@ -344,6 +369,11 @@ admin.get("/users/:id", async (req, res) => {
       ...event,
       ipAddress: maskedIp(event.ipAddress),
       userAgent: event.userAgent?.slice(0, 180) ?? null,
+    })),
+    payments,
+    signInMethods: accounts.map((a) => ({
+      method: a.providerId === "credential" ? "password" : a.providerId,
+      linkedAt: a.createdAt,
     })),
   });
 });
@@ -430,6 +460,92 @@ admin.get("/subscriptions", async (req, res) => {
     },
   });
 });
+const paymentSelect = {
+  id: true,
+  userId: true,
+  status: true,
+  billingReason: true,
+  amountDue: true,
+  amountPaid: true,
+  amountRefunded: true,
+  currency: true,
+  periodStart: true,
+  periodEnd: true,
+  paidAt: true,
+  hostedInvoiceUrl: true,
+  disputed: true,
+  fraudWarning: true,
+  createdAt: true,
+} satisfies Prisma.PaymentSelect;
+const paymentStatuses = [
+  "paid",
+  "failed",
+  "open",
+  "void",
+  "uncollectible",
+  "refunded",
+  "partially_refunded",
+];
+admin.get("/payments", async (req, res) => {
+  const f = querySchema.parse(req.query);
+  const { from, to } = activityWindow(f);
+  assert(
+    !f.status || [...paymentStatuses, "flagged"].includes(f.status),
+    400,
+    "Choose a known payment status.",
+  );
+  const where: Prisma.PaymentWhereInput = {
+    createdAt: { gte: from, lte: to },
+    ...(f.status === "flagged"
+      ? { OR: [{ disputed: true }, { fraudWarning: true }] }
+      : f.status
+        ? { status: f.status }
+        : {}),
+    ...(f.user ? { userId: f.user } : {}),
+    ...(f.q
+      ? {
+          AND: [
+            {
+              OR: [
+                { id: { contains: f.q } },
+                { user: { email: { contains: f.q, mode: "insensitive" } } },
+              ],
+            },
+          ],
+        }
+      : {}),
+  };
+  const [rows, total, totals] = await Promise.all([
+    db.payment.findMany({
+      where,
+      select: { ...paymentSelect, user: { select: { email: true } } },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      take: pageSize,
+      skip: (f.page - 1) * pageSize,
+    }),
+    db.payment.count({ where }),
+    db.payment.groupBy({
+      by: ["currency"],
+      where: { createdAt: { gte: from, lte: to } },
+      _sum: { amountPaid: true, amountRefunded: true },
+      _count: { _all: true },
+    }),
+  ]);
+  res.json({
+    ...pageResult(
+      rows.map(({ user, ...p }) => ({ ...p, email: user?.email ?? null })),
+      total,
+      f.page,
+    ),
+    totals: totals.map((t) => ({
+      currency: t.currency,
+      payments: t._count._all,
+      collected: (t._sum.amountPaid ?? 0) / 100,
+      refunded: (t._sum.amountRefunded ?? 0) / 100,
+    })),
+    note: "Collected is what customers paid before Stripe fees. Refunds and disputes are settled in Stripe.",
+  });
+});
 admin.get("/jobs", async (req, res) => {
   const f = querySchema.parse(req.query);
   const where: Prisma.JobWhereInput = {
@@ -474,55 +590,61 @@ function maskedIp(value: string | null) {
 admin.get("/activity", async (req, res) => {
   const f = querySchema.parse(req.query);
   const { from, to } = activityWindow(f);
+  // Emails are looked up at read time so a row still shows who it was about
+  // after the account changes its address. Trips show their owner, never
+  // their contents.
+  const events = Prisma.sql`
+    WITH events AS (
+      SELECT id, "actorId", "targetId", NULL::text AS "targetType", action,
+             reason, outcome, change, "createdAt", 'admin'::text AS source
+      FROM "AdminAudit"
+      UNION ALL
+      SELECT id, "actorId", "targetId", "targetType", action,
+             'User activity'::text, 'success'::text,
+             jsonb_build_object('before', "before", 'after', "after"),
+             "createdAt", 'user'::text
+      FROM "AuditLog"
+    )
+    SELECT e.*, actor.email AS "actorEmail", target.email AS "targetEmail",
+           owner.email AS "tripOwnerEmail"
+    FROM events e
+    LEFT JOIN "user" actor ON actor.id = e."actorId"
+    LEFT JOIN "user" target ON target.id = e."targetId"
+    LEFT JOIN "Trip" trip ON trip.id = e."targetId"
+    LEFT JOIN "user" owner ON owner.id = trip."ownerId"
+    WHERE e."createdAt" >= ${from} AND e."createdAt" <= ${to}
+      AND (${f.status} = '' OR e.action = ${f.status})
+      AND (${f.user} = '' OR e."targetId" = ${f.user} OR e."actorId" = ${f.user})
+      AND (${f.q} = '' OR e."targetId" ILIKE '%' || ${f.q} || '%'
+                       OR e."actorId" ILIKE '%' || ${f.q} || '%'
+                       OR actor.email ILIKE '%' || ${f.q} || '%'
+                       OR target.email ILIKE '%' || ${f.q} || '%'
+                       OR owner.email ILIKE '%' || ${f.q} || '%')
+  `;
   const [rows, totalRows] = await Promise.all([
     db.$queryRaw<
       {
         id: string;
         actorId: string;
         targetId: string;
+        targetType: string | null;
         action: string;
         reason: string;
         outcome: string;
         change: Prisma.JsonValue;
         createdAt: Date;
         source: string;
+        actorEmail: string | null;
+        targetEmail: string | null;
+        tripOwnerEmail: string | null;
       }[]
     >`
-      WITH events AS (
-        SELECT id, "actorId", "targetId", action, reason, outcome, change,
-               "createdAt", 'admin'::text AS source
-        FROM "AdminAudit"
-        UNION ALL
-        SELECT id, "actorId", "targetId", action, 'User activity'::text,
-               'success'::text,
-               jsonb_build_object('before', "before", 'after', "after"),
-               "createdAt", 'user'::text
-        FROM "AuditLog"
-      )
-      SELECT id, "actorId", "targetId", action, reason, outcome, change,
-             "createdAt", source
-      FROM events
-      WHERE "createdAt" >= ${from} AND "createdAt" <= ${to}
-        AND (${f.status} = '' OR action = ${f.status})
-        AND (${f.user} = '' OR "targetId" = ${f.user} OR "actorId" = ${f.user})
-        AND (${f.q} = '' OR "targetId" ILIKE '%' || ${f.q} || '%'
-                         OR "actorId" ILIKE '%' || ${f.q} || '%')
+      SELECT * FROM (${events}) rows
       ORDER BY "createdAt" DESC, id ASC
       LIMIT ${pageSize} OFFSET ${(f.page - 1) * pageSize}
     `,
     db.$queryRaw<{ total: bigint }[]>`
-      WITH events AS (
-        SELECT id, "actorId", "targetId", action, "createdAt" FROM "AdminAudit"
-        UNION ALL
-        SELECT id, "actorId", "targetId", action, "createdAt" FROM "AuditLog"
-      )
-      SELECT count(*) AS total
-      FROM events
-      WHERE "createdAt" >= ${from} AND "createdAt" <= ${to}
-        AND (${f.status} = '' OR action = ${f.status})
-        AND (${f.user} = '' OR "targetId" = ${f.user} OR "actorId" = ${f.user})
-        AND (${f.q} = '' OR "targetId" ILIKE '%' || ${f.q} || '%'
-                         OR "actorId" ILIKE '%' || ${f.q} || '%')
+      SELECT count(*) AS total FROM (${events}) rows
     `,
   ]);
   const total = Number(totalRows[0]?.total ?? 0n);
@@ -531,11 +653,23 @@ admin.get("/activity", async (req, res) => {
 admin.get("/login-events", async (req, res) => {
   const f = querySchema.parse(req.query);
   const { from, to } = activityWindow(f);
+  assert(
+    !f.status || (securityEventNames as string[]).includes(f.status),
+    400,
+    "Choose a known security event.",
+  );
   const where: Prisma.LoginEventWhereInput = {
     createdAt: { gte: from, lte: to },
     ...(f.status ? { event: f.status } : {}),
     ...(f.user ? { userId: f.user } : {}),
-    ...(f.q ? { AND: [{ userId: { contains: f.q } }] } : {}),
+    ...(f.q
+      ? {
+          OR: [
+            { userId: { contains: f.q } },
+            { email: { contains: f.q.toLowerCase() } },
+          ],
+        }
+      : {}),
   };
   const [rows, total] = await Promise.all([
     db.loginEvent.findMany({
@@ -543,7 +677,9 @@ admin.get("/login-events", async (req, res) => {
       select: {
         id: true,
         userId: true,
+        email: true,
         event: true,
+        method: true,
         ipAddress: true,
         userAgent: true,
         createdAt: true,
@@ -554,10 +690,25 @@ admin.get("/login-events", async (req, res) => {
     }),
     db.loginEvent.count({ where }),
   ]);
+  // Older rows only kept the account id.
+  const emails = new Map(
+    (
+      await db.user.findMany({
+        where: {
+          id: {
+            in: rows.flatMap((e) => (e.userId && !e.email ? [e.userId] : [])),
+          },
+        },
+        select: { id: true, email: true },
+      })
+    ).map((u) => [u.id, u.email.toLowerCase()]),
+  );
   res.json(
     pageResult(
       rows.map((event) => ({
         ...event,
+        email:
+          event.email ?? (event.userId && emails.get(event.userId)) ?? null,
         ipAddress: maskedIp(event.ipAddress),
         userAgent: event.userAgent?.slice(0, 180) ?? null,
       })),
@@ -581,6 +732,9 @@ admin.get("/overview", async (req, res) => {
     trend,
     firstEvent,
     failedEvents,
+    failedPayments,
+    flaggedPayments,
+    lockouts,
   ] = await Promise.all([
     db.user.count({ where: { emailVerified: true } }),
     db.trip.count({ where: { createdAt: { gte: since } } }),
@@ -601,6 +755,18 @@ admin.get("/overview", async (req, res) => {
       select: { createdAt: true },
     }),
     db.stripeEvent.count({ where: { status: "failed" } }),
+    db.payment.count({
+      where: { status: "failed", createdAt: { gte: since } },
+    }),
+    db.payment.count({
+      where: { OR: [{ disputed: true }, { fraudWarning: true }] },
+    }),
+    db.loginEvent.count({
+      where: {
+        event: "login_locked",
+        createdAt: { gte: new Date(Date.now() - 86400000) },
+      },
+    }),
   ]);
   const active = entitlements.filter(hasPro),
     mrr = active.map(subscriptionDTO);
@@ -631,6 +797,28 @@ admin.get("/overview", async (req, res) => {
       title: `${failedEvents} Stripe webhook failures`,
       detail: "Review subscription synchronization.",
       href: "/admin/subscriptions",
+      severity: "warning",
+    });
+  if (flaggedPayments)
+    attention.push({
+      title: `${flaggedPayments} disputed or fraud-flagged payments`,
+      detail: "Respond in Stripe before the dispute deadline.",
+      href: "/admin/payments?status=flagged",
+      severity: "critical",
+    });
+  if (failedPayments)
+    attention.push({
+      title: `${failedPayments} failed payments`,
+      detail: "Stripe retries automatically and emails the customer.",
+      href: "/admin/payments?status=failed",
+      severity: "warning",
+    });
+  if (lockouts)
+    attention.push({
+      title: `${lockouts} account lockouts in 24 hours`,
+      detail:
+        "Repeated wrong passwords. Check whether one address is being targeted.",
+      href: "/admin/login-events?status=login_locked&days=7",
       severity: "warning",
     });
   const unsynced = await db.entitlement.count({
@@ -713,6 +901,7 @@ const actionBody = z
     kind: z.enum(["trip", "menu"]).optional(),
     limit: z.number().int().min(0).optional(),
     paused: z.boolean().optional(),
+    role: z.enum(["admin", "client"]).optional(),
   })
   .strict();
 admin.post("/actions/:action/:target", async (req, res) => {
@@ -727,6 +916,7 @@ admin.post("/actions/:action/:target", async (req, res) => {
       "integration",
       "resync",
       "resync-event",
+      "set-role",
     ])
     .parse(req.params.action);
   const target = z.string().min(1).max(160).parse(req.params.target),
@@ -779,15 +969,77 @@ admin.post("/actions/:action/:target", async (req, res) => {
       }
       let change: Prisma.InputJsonObject = {};
       if (
-        ["grant", "suspend", "reactivate", "revoke-sessions"].includes(action)
+        [
+          "grant",
+          "suspend",
+          "reactivate",
+          "revoke-sessions",
+          "set-role",
+        ].includes(action)
       ) {
         await accountLock(tx, target);
         const user = await tx.user.findUnique({
           where: { id: target },
-          select: { suspendedAt: true },
+          select: { suspendedAt: true, role: true, emailVerified: true },
         });
         assert(user, 404, "Account not found.");
-        if (action === "grant") {
+        // The owner is configured on the server and cannot be locked out from
+        // here; other administrators answer only to the owner.
+        assert(
+          action === "grant" || !isOwnerId(target),
+          403,
+          "The owner account can only be changed on the server.",
+          "OWNER_PROTECTED",
+        );
+        assert(
+          action === "grant" || user.role !== "admin" || isOwnerId(actor),
+          403,
+          "Only the owner can change another administrator's access.",
+          "OWNER_REQUIRED",
+        );
+        assert(
+          action !== "grant" || target !== actor || isOwnerId(actor),
+          403,
+          "Ask another administrator to grant credits to your own account.",
+          "SELF_GRANT",
+        );
+        if (action === "set-role") {
+          assert(
+            isOwnerId(actor),
+            403,
+            "Only the owner can change administrator roles.",
+            "OWNER_REQUIRED",
+          );
+          assert(body.role, 400, "Choose a role.");
+          assert(
+            user.role !== body.role,
+            409,
+            `This account is already ${body.role === "admin" ? "an administrator" : "a client"}.`,
+          );
+          assert(
+            body.role === "client" || (user.emailVerified && !user.suspendedAt),
+            409,
+            "Only verified, active accounts can become administrators.",
+          );
+          await tx.user.update({
+            where: { id: target },
+            data: { role: body.role },
+          });
+          // A demoted account loses admin immediately, even mid-session.
+          const proofs =
+            body.role === "client"
+              ? (
+                  await tx.adminProof.deleteMany({
+                    where: { session: { userId: target } },
+                  })
+                ).count
+              : 0;
+          change = {
+            before: user.role,
+            after: body.role,
+            adminSessionsClosed: proofs,
+          };
+        } else if (action === "grant") {
           assert(
             body.kind && body.quantity,
             400,

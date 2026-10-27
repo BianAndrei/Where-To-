@@ -74,6 +74,8 @@ export function metadataPlugin(originValue?: string): Plugin {
         "/reset-password",
         "/admin",
         "/two-factor",
+        "/billing/success",
+        "/billing/canceled",
       ]) {
         const directory = resolve(outDir, path.slice(1));
         await mkdir(directory, { recursive: true });
@@ -93,7 +95,7 @@ export function metadataPlugin(originValue?: string): Plugin {
       }
       await writeFile(
         resolve(outDir, "robots.txt"),
-        "User-agent: *\nDisallow: /admin\nDisallow: /two-factor\nDisallow: /app\nDisallow: /share/\nDisallow: /join/\nDisallow: /api/\nDisallow: /files/\nDisallow: /login\nDisallow: /signup\nDisallow: /reset-password\nDisallow: /demo\n" +
+        "User-agent: *\nDisallow: /admin\nDisallow: /two-factor\nDisallow: /app\nDisallow: /share/\nDisallow: /join/\nDisallow: /api/\nDisallow: /files/\nDisallow: /login\nDisallow: /signup\nDisallow: /reset-password\nDisallow: /billing/\nDisallow: /demo\n" +
           (origin ? `Sitemap: ${origin}/sitemap.xml\n` : ""),
       );
       if (origin)

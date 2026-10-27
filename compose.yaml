@@ -18,6 +18,8 @@ services:
       APP_URL: http://localhost:8080
       DATA_DIR: /app/.data
       HOST: 0.0.0.0
+      # nginx in the web container is the single proxy in front of the API.
+      TRUST_PROXY: "1"
     command:
       ["node", "../../node_modules/prisma/build/index.js", "migrate", "deploy"]
     depends_on:

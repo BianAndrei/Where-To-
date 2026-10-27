@@ -22,12 +22,15 @@ export async function api<T = any>(
     if (url === "/config")
       return {
         googleAuth: false,
+        appleAuth: false,
+        socialSetupHints: false,
         googlePlaces: false,
         maps: false,
         menus: false,
         transit: false,
         payments: false,
         localMailbox: false,
+        emailSetupHint: false,
         monthlyPrice: 5,
         annualPrice: 40,
         freeMenus: 10,
@@ -64,12 +67,15 @@ export const post = <T = any>(url: string, body: unknown) =>
   api<T>(url, { method: "POST", body: JSON.stringify(body) });
 export interface Features {
   googleAuth: boolean;
+  appleAuth: boolean;
+  socialSetupHints: boolean;
   googlePlaces: boolean;
   maps: boolean;
   menus: boolean;
   transit: boolean;
   payments: boolean;
   localMailbox: boolean;
+  emailSetupHint: boolean;
   monthlyPrice: number;
   annualPrice: number;
   freeMenus: number;
